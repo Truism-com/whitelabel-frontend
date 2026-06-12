@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogHeader, DialogBody } from "@/components/ui/dialog";
 import { Building2, ShieldAlert, ArrowRight, Eye, Calendar, Users, CalendarCheck, TrendingUp } from "lucide-react";
 
 export default function TenantsPage() {
@@ -103,12 +103,9 @@ export default function TenantsPage() {
       )}
 
       {/* Tenant statistics dialog */}
-      <Dialog open={!!selectedTenantId} onOpenChange={(open) => !open && setSelectedTenantId(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{selectedTenant?.name ?? "Tenant Stats"}</DialogTitle>
-          </DialogHeader>
-
+      <Dialog open={!!selectedTenantId} onClose={() => setSelectedTenantId(null)} size="sm">
+        <DialogHeader title={selectedTenant?.name ?? "Tenant Stats"} onClose={() => setSelectedTenantId(null)} />
+        <DialogBody>
           {statsError ? (
             <div className="p-4 bg-red-50 text-red-700 text-xs rounded-xl flex items-center gap-2">
               <ShieldAlert className="h-4 w-4 shrink-0" />
@@ -155,7 +152,7 @@ export default function TenantsPage() {
               </div>
             </div>
           )}
-        </DialogContent>
+        </DialogBody>
       </Dialog>
     </div>
   );
