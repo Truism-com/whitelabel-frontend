@@ -6,7 +6,7 @@ import axios, {
 import type { ApiError } from "@/lib/types/api.types";
 
 const BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 /* ─── Token helpers (browser-only) ─────────────────────────────── */
 const storage = {
@@ -60,7 +60,7 @@ apiClient.interceptors.request.use(
         .split("; ")
         .find((r) => r.startsWith("x-tenant-slug="))
         ?.split("=")[1];
-      if (tenantSlug) config.headers["X-Tenant-Slug"] = tenantSlug;
+      if (tenantSlug) config.headers["X-Tenant-Code"] = tenantSlug;
     }
     return config;
   },
