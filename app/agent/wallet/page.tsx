@@ -39,7 +39,7 @@ function TopupDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
   });
 
   const onSubmit = async (v: TopupForm) => {
-    await requestTopup.mutateAsync({ ...v, amount: v.amount * 100 });
+    await requestTopup.mutateAsync({ ...v, amount: v.amount });
     reset();
     onClose();
   };
@@ -117,7 +117,7 @@ export default function AgentWalletPage() {
               <p className="text-sm font-medium opacity-70 mb-1">Available Balance</p>
               {walletLoading
                 ? <Skeleton className="h-9 w-40 bg-white/20 rounded-lg" />
-                : <p className="text-4xl font-bold">₹{((wallet?.balance ?? 0) / 100).toLocaleString("en-IN")}</p>
+                : <p className="text-4xl font-bold">₹{(wallet?.balance ?? 0).toLocaleString("en-IN")}</p>
               }
             </div>
             <div className="h-12 w-12 rounded-xl bg-white/20 flex items-center justify-center">
@@ -129,7 +129,7 @@ export default function AgentWalletPage() {
             {wallet?.credit_limit ? (
               <div>
                 <p className="text-[11px] opacity-60">Credit Limit</p>
-                <p className="font-semibold">₹{(wallet.credit_limit / 100).toLocaleString("en-IN")}</p>
+                <p className="font-semibold">₹{wallet.credit_limit.toLocaleString("en-IN")}</p>
               </div>
             ) : null}
             <div>

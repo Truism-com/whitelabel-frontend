@@ -52,6 +52,39 @@ function AuthPanel() {
       <div className="absolute top-1/3 left-1/3 w-80 h-80 bg-blue-600/25 rounded-full blur-3xl" />
       <div className="absolute bottom-1/4 right-1/4 w-60 h-60 bg-indigo-600/20 rounded-full blur-3xl" />
 
+      {/* Flight Path SVG Animation */}
+      <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-20" xmlns="http://www.w3.org/2000/svg">
+        <path
+          id="flight-path"
+          d="M 50 600 Q 200 200 450 350 T 750 150"
+          fill="none"
+          stroke="white"
+          strokeWidth="2"
+          strokeDasharray="6 6"
+        />
+        <g className="motion-reduce:hidden">
+          <path
+            fill="white"
+            d="M -6 -6 L 12 0 L -6 6 L -3 0 Z"
+          >
+            <animateMotion
+              dur="3s"
+              repeatCount="1"
+              fill="freeze"
+              path="M 50 600 Q 200 200 450 350 T 750 150"
+              rotate="auto"
+            />
+          </path>
+        </g>
+        <g className="hidden motion-reduce:block">
+          <path
+            fill="white"
+            d="M -6 -6 L 12 0 L -6 6 L -3 0 Z"
+            transform="translate(750, 150) rotate(-20)"
+          />
+        </g>
+      </svg>
+
       {/* Logo */}
       <div className="relative flex items-center gap-3">
         <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center shadow-lg">

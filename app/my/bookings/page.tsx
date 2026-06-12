@@ -3,13 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  Search, Download, XCircle, Clock, CheckCircle2,
-  PlaneTakeoff, ChevronLeft, ChevronRight, Filter,
+  Search, Download, XCircle,
+  PlaneTakeoff, ChevronLeft, ChevronRight,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogHeader, DialogBody, DialogFooter } from "@/components/ui/dialog";
 import { FormField } from "@/components/ui/form-field";
@@ -19,16 +16,9 @@ import { useCustomerBookings, useCancelBooking } from "@/lib/hooks/use-customer"
 import { customerApi } from "@/lib/api/customer";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils/cn";
-import type { BookingStatus, CustomerBooking } from "@/lib/types/customer.types";
-
-const STATUS_CFG: Record<BookingStatus, { label: string; variant: "success" | "warning" | "destructive" | "secondary" }> = {
-  confirmed:  { label: "Confirmed",  variant: "success" },
-  pending:    { label: "Pending",    variant: "warning" },
-  processing: { label: "Processing", variant: "warning" },
-  cancelled:  { label: "Cancelled",  variant: "destructive" },
-  refunded:   { label: "Refunded",   variant: "secondary" },
-  failed:     { label: "Failed",     variant: "destructive" },
-};
+import type { CustomerBooking } from "@/lib/types/customer.types";
+import { PageHeader } from "@/components/common/page-header";
+import { StatusBadge } from "@/components/common/status-badge";
 
 const PAGE_SIZE = 8;
 
@@ -42,19 +32,19 @@ function CancelDialog({ booking, open, onClose }: { booking: CustomerBooking | n
         <div className="space-y-4">
           <div className="rounded-xl bg-red-50 border border-red-100 p-4 text-sm text-red-700">
             <p className="font-semibold mb-1">Cancel {booking?.pnr ?? booking?.booking_ref}?</p>
-            <p className="text-xs text-red-500">Refund (if applicable) will be processed in 5–7 business days.</p>
+            <p className="text-xs text-red-500">Refund (if applicable) will be processed in 5-7 business days.</p>
           </div>
-          <FormField label="Reason (optional)">
-            <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="Why are you cancelling?" />
+          <FormField label="Reason for Cancellation" error={reason.trim().length > 0 && reason.trim().length < 10 ? "Reason must be at least 10 characters long" : undefined} required>
+            <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="Reason for cancellation (min 10 characters)..." />
           </FormField>
         </div>
       </DialogBody>
       <DialogFooter>
         <Button variant="outline" size="sm" onClick={onClose}>Keep Booking</Button>
-        <Button variant="destructive" size="sm" isLoading={cancel.isPending}
+        <Button variant="destructive" size="sm" isLoading={cancel.isPending} disabled={reason.trim().length < 10}
           onClick={async () => {
             if (!booking) return;
-            await cancel.mutateAsync({ id: booking.id, reason: reason.trim() || undefined });
+            await cancel.mutateAsync({ id: booking.id, reason: reason.trim() });
             onClose();
           }}>
           Cancel Booking
@@ -65,7 +55,6 @@ function CancelDialog({ booking, open, onClose }: { booking: CustomerBooking | n
 }
 
 function BookingCard({ booking }: { booking: CustomerBooking }) {
-  const cfg = STATUS_CFG[booking.status] ?? STATUS_CFG.pending;
   const [downloading, setDownloading] = useState(false);
   const canCancel = booking.status === "confirmed" || booking.status === "pending" || booking.status === "processing";
   const [showCancel, setShowCancel] = useState(false);
@@ -87,7 +76,7 @@ function BookingCard({ booking }: { booking: CustomerBooking }) {
 
   return (
     <>
-      <div className="rounded-2xl bg-white border border-slate-200 hover:shadow-md transition-shadow overflow-hidden">
+      <div className="rounded-2xl bg-white border border-slate-200 hover:shadow-md hover:-translate-y-0.5 transition-all motion-reduce:transition-none duration-300 ease-in-out overflow-hidden">
         {/* Status bar */}
         <div className={cn(
           "px-5 py-2.5 flex items-center justify-between text-xs",
@@ -96,7 +85,7 @@ function BookingCard({ booking }: { booking: CustomerBooking }) {
           "bg-amber-50 text-amber-700"
         )}>
           <span className="font-semibold font-mono">{booking.pnr ?? booking.booking_ref}</span>
-          <Badge variant={cfg.variant} className="text-[10px]">{cfg.label}</Badge>
+          <StatusBadge status={booking.status as any} />
         </div>
 
         <div className="p-5">
@@ -132,7 +121,7 @@ function BookingCard({ booking }: { booking: CustomerBooking }) {
               <span>👤 {booking.passenger_count} pax</span>
               {booking.cabin_class && <span className="capitalize">🪑 {booking.cabin_class.replace("_", " ")}</span>}
             </div>
-            <p className="font-bold text-slate-800 text-base">₹{(booking.total_amount / 100).toLocaleString("en-IN")}</p>
+            <p className="font-bold text-slate-800 text-base">₹{booking.total_amount.toLocaleString("en-IN")}</p>
           </div>
 
           {/* Actions */}
@@ -184,10 +173,10 @@ export default function BookingsPage() {
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">My Bookings</h1>
-        <p className="text-sm text-slate-500 mt-0.5">All your flight bookings in one place</p>
-      </div>
+      <PageHeader
+        title="My Bookings"
+        description="All your flight bookings in one place"
+      />
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">

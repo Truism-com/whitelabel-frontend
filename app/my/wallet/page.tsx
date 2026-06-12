@@ -46,7 +46,7 @@ function TopupDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
   });
 
   const onSubmit = async (v: TopupForm) => {
-    await req.mutateAsync({ ...v, amount: v.amount * 100 });
+    await req.mutateAsync({ ...v, amount: v.amount });
     reset(); onClose();
   };
 
@@ -139,7 +139,7 @@ export default function CustomerWalletPage() {
           </div>
           {walletLoading
             ? <Skeleton className="h-10 w-44 bg-white/20 rounded-lg mt-1" />
-            : <p className="text-4xl font-bold mt-1">₹{((wallet?.balance ?? 0) / 100).toLocaleString("en-IN")}</p>
+            : <p className="text-4xl font-bold mt-1">₹{(wallet?.balance ?? 0).toLocaleString("en-IN")}</p>
           }
           <p className="text-white/50 text-xs mt-1">
             {wallet?.is_suspended ? "⛔ Wallet suspended — contact support" : "✓ Active"}
@@ -207,7 +207,7 @@ export default function CustomerWalletPage() {
                       </div>
                       <div className="text-right shrink-0">
                         <p className={cn("font-bold text-sm", pos ? "text-emerald-600" : "text-red-500")}>
-                          {cfg.sign}₹{(t.amount / 100).toLocaleString("en-IN")}
+                          {cfg.sign}₹{t.amount.toLocaleString("en-IN")}
                         </p>
                         <p className="text-[10px] text-slate-400 mt-0.5">
                           {new Date(t.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}

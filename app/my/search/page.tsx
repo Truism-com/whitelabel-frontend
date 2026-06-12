@@ -6,9 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   PlaneTakeoff, PlaneLanding, Search, ArrowLeftRight,
-  Clock, Luggage, Check, AlertCircle, ArrowRight,
+  Luggage, Check, AlertCircle, ArrowRight,
   RefreshCw, Plus, Trash2, ChevronDown, ChevronUp,
-  Wifi, Utensils,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,8 +23,8 @@ import type { FlightResult, FlightSearchResponse } from "@/lib/types/agent.types
 
 /* ─── Schemas ─────────────────────────────────────────────────────── */
 const searchSchema = z.object({
-  origin:      z.string().min(3).max(3),
-  destination: z.string().min(3).max(3),
+  origin:      z.string().regex(/^[A-Z]{3}$/, "Must be exactly 3 uppercase letters (e.g. DEL)"),
+  destination: z.string().regex(/^[A-Z]{3}$/, "Must be exactly 3 uppercase letters (e.g. BOM)"),
   travel_date: z.string().min(1, "Select a date"),
   return_date: z.string().optional(),
   adults:      z.number().int().min(1).max(9),
@@ -38,11 +37,12 @@ type SearchForm = z.infer<typeof searchSchema>;
 
 const passengerSchema = z.object({
   type:        z.enum(["ADT", "CHD", "INF"]),
-  title:       z.enum(["Mr", "Mrs", "Ms", "Master", "Miss"]),
-  first_name:  z.string().min(1, "Required"),
-  last_name:   z.string().min(1, "Required"),
-  dob:         z.string().optional(),
+  title:       z.enum(["Mr", "Mrs", "Ms", "Miss", "Dr", "Mstr"]),
+  first_name:  z.string().min(2, "Must be 2-100 characters").max(100, "Must be 2-100 characters"),
+  last_name:   z.string().min(2, "Must be 2-100 characters").max(100, "Must be 2-100 characters"),
+  dob:         z.string().min(1, "Date of birth is required"),
   passport_no: z.string().optional(),
+  nationality: z.string().length(2, "Must be a 2-letter ISO code (e.g. IN)").optional(),
 });
 
 const bookingSchema = z.object({
@@ -53,14 +53,22 @@ const bookingSchema = z.object({
 type BookingForm = z.infer<typeof bookingSchema>;
 
 /* ─── Helpers ─────────────────────────────────────────────────────── */
-function fmtDuration(mins: number) {
-  return `${Math.floor(mins / 60)}h ${mins % 60 > 0 ? `${mins % 60}m` : ""}`.trim();
-}
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+function parseDuration(duration: string): number {
+  try {
+    const hours = duration.match(/(\d+)h/);
+    const mins = duration.match(/(\d+)m/);
+    const h = hours ? parseInt(hours[1], 10) : 0;
+    const m = mins ? parseInt(mins[1], 10) : 0;
+    return h * 60 + m;
+  } catch {
+    return 0;
+  }
 }
 
 /* ─── Sort & filter bar ───────────────────────────────────────────── */
@@ -92,7 +100,6 @@ function FlightCard({ result, selected, onSelect }: {
   result: FlightResult; selected: boolean; onSelect: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const seg = result.segments[0];
 
   return (
     <div className={cn(
@@ -108,46 +115,46 @@ function FlightCard({ result, selected, onSelect }: {
               <PlaneTakeoff className="h-4 w-4 text-slate-400" />
             </div>
             <div className="min-w-0">
-              <p className="font-semibold text-slate-900 text-sm truncate">{seg.airline}</p>
-              <p className="text-xs text-slate-400 font-mono">{seg.flight_number}</p>
+              <p className="font-semibold text-slate-900 text-sm truncate">{result.airline}</p>
+              <p className="text-xs text-slate-400 font-mono">{result.flight_number}</p>
             </div>
           </div>
 
           {/* Times & route */}
           <div className="flex-1 flex items-center gap-3 min-w-0">
             <div className="text-center">
-              <p className="text-xl font-bold text-slate-900">{fmtTime(seg.departure_time)}</p>
-              <p className="text-xs font-semibold text-slate-500">{seg.origin}</p>
+              <p className="text-xl font-bold text-slate-900">{fmtTime(result.departure_time)}</p>
+              <p className="text-xs font-semibold text-slate-500">{result.origin}</p>
             </div>
             <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
-              <p className="text-[11px] text-slate-400">{fmtDuration(seg.duration_minutes)}</p>
+              <p className="text-[11px] text-slate-400">{result.duration}</p>
               <div className="w-full flex items-center gap-1">
                 <div className="flex-1 h-px bg-slate-200" />
                 <PlaneTakeoff className="h-3 w-3 text-slate-300" />
                 <div className="flex-1 h-px bg-slate-200" />
               </div>
               <p className="text-[11px] text-slate-400">
-                {seg.stops === 0 ? "Non-stop" : `${seg.stops} stop${seg.stops > 1 ? "s" : ""}`}
+                {result.stops === 0 ? "Non-stop" : `${result.stops} stop${result.stops > 1 ? "s" : ""}`}
               </p>
             </div>
             <div className="text-center">
-              <p className="text-xl font-bold text-slate-900">{fmtTime(seg.arrival_time)}</p>
-              <p className="text-xs font-semibold text-slate-500">{seg.destination}</p>
+              <p className="text-xl font-bold text-slate-900">{fmtTime(result.arrival_time)}</p>
+              <p className="text-xs font-semibold text-slate-500">{result.destination}</p>
             </div>
           </div>
 
           {/* Price */}
           <div className="sm:text-right shrink-0 sm:w-32">
             <p className="text-2xl font-bold text-slate-900">
-              ₹{(result.fare.total / 100).toLocaleString("en-IN")}
+              ₹{result.price.toLocaleString("en-IN")}
             </p>
             <p className="text-[11px] text-slate-400">per person</p>
             <div className="flex sm:justify-end gap-1.5 mt-1.5 flex-wrap">
-              <Badge variant={result.is_refundable ? "success" : "secondary"} className="text-[10px]">
-                {result.is_refundable ? "Refundable" : "Non-refund"}
+              <Badge variant={result.refundable ? "success" : "secondary"} className="text-[10px]">
+                {result.refundable ? "Refundable" : "Non-refund"}
               </Badge>
-              {result.meal_included && (
-                <Badge variant="info" className="text-[10px]">Meal</Badge>
+              {result.travel_class && (
+                <Badge variant="info" className="text-[10px] capitalize">{result.travel_class}</Badge>
               )}
             </div>
           </div>
@@ -155,9 +162,8 @@ function FlightCard({ result, selected, onSelect }: {
 
         {/* Amenities strip */}
         <div className="mt-3 flex items-center gap-3 text-[11px] text-slate-400">
-          <span className="flex items-center gap-1"><Luggage className="h-3 w-3" />{result.baggage_info ?? "15 kg"}</span>
-          {result.meal_included && <span className="flex items-center gap-1"><Utensils className="h-3 w-3" />Meal</span>}
-          <span className="ml-auto text-[10px] font-medium text-emerald-600">{result.seats_available} seats left</span>
+          <span className="flex items-center gap-1"><Luggage className="h-3 w-3" />{result.baggage_allowance ?? "15 kg"}</span>
+          {result.aircraft && <span className="flex items-center gap-1">✈️ {result.aircraft}</span>}
         </div>
       </button>
 
@@ -173,17 +179,10 @@ function FlightCard({ result, selected, onSelect }: {
         </button>
         {expanded && (
           <div className="px-5 pb-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-            {[
-              { label: "Base Fare", value: result.fare.base_fare },
-              { label: "Taxes",     value: result.fare.taxes },
-              { label: "Fees",      value: result.fare.fees },
-              ...(result.fare.markup ? [{ label: "Markup", value: result.fare.markup }] : []),
-            ].map(({ label, value }) => (
-              <div key={label} className="bg-slate-50 rounded-lg p-2.5">
-                <p className="text-slate-400 mb-0.5">{label}</p>
-                <p className="font-semibold text-slate-700">₹{(value / 100).toLocaleString("en-IN")}</p>
-              </div>
-            ))}
+            <div className="bg-slate-50 rounded-lg p-2.5 col-span-2 sm:col-span-4">
+              <p className="text-slate-400 mb-0.5">Total Price</p>
+              <p className="font-semibold text-slate-700">₹{result.price.toLocaleString("en-IN")}</p>
+            </div>
           </div>
         )}
       </div>
@@ -221,15 +220,15 @@ export default function SearchPage() {
   const { register: bReg, handleSubmit: bSubmit, control, getValues,
     formState: { errors: bErrors } } = useForm<BookingForm>({
     resolver: zodResolver(bookingSchema),
-    defaultValues: { passengers: [{ type: "ADT", title: "Mr", first_name: "", last_name: "" }] },
+    defaultValues: { passengers: [{ type: "ADT", title: "Mr", first_name: "", last_name: "", dob: "" }] },
   });
   const { fields, append, remove } = useFieldArray({ control, name: "passengers" });
 
   /* Sorting */
   const sorted = results ? [...results.results].sort((a, b) => {
-    if (sort === "price")     return a.fare.total - b.fare.total;
-    if (sort === "duration")  return a.segments[0].duration_minutes - b.segments[0].duration_minutes;
-    return new Date(a.segments[0].departure_time).getTime() - new Date(b.segments[0].departure_time).getTime();
+    if (sort === "price")     return a.price - b.price;
+    if (sort === "duration")  return parseDuration(a.duration) - parseDuration(b.duration);
+    return new Date(a.departure_time).getTime() - new Date(b.departure_time).getTime();
   }) : [];
 
   const onSearch = sSubmit(async (v) => {
@@ -246,8 +245,19 @@ export default function SearchPage() {
     const v = getValues();
     await createBooking.mutateAsync({
       search_id:     results.search_id,
-      result_id:     selected.result_id,
-      passengers:    v.passengers,
+      offer_id:      selected.offer_id,
+      passengers:    v.passengers.map(p => ({
+        type: p.type,
+        title: p.title,
+        first_name: p.first_name,
+        last_name: p.last_name,
+        dob: p.dob,
+        passport_number: p.passport_no || undefined,
+        nationality: p.nationality || undefined,
+      })),
+      payment_details: {
+        method: "wallet",
+      },
       contact_email: v.contact_email,
       contact_phone: v.contact_phone,
     });
@@ -256,7 +266,7 @@ export default function SearchPage() {
     setSelected(null);
   };
 
-  const totalFare = selected ? selected.fare.total * fields.length : 0;
+  const totalFare = selected ? selected.price * fields.length : 0;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -286,7 +296,7 @@ export default function SearchPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 relative">
             <FormField label="From" error={sErrors.origin?.message} required>
               <Input
-                {...sReg("origin", { setValueAs: (v: string) => v?.toUpperCase() })}
+                {...sReg("origin", { setValueAs: (v: string) => v?.toUpperCase()?.trim() })}
                 placeholder="DEL — Delhi"
                 maxLength={3}
                 className="uppercase font-mono text-base h-12"
@@ -308,7 +318,7 @@ export default function SearchPage() {
             </div>
             <FormField label="To" error={sErrors.destination?.message} required>
               <Input
-                {...sReg("destination", { setValueAs: (v: string) => v?.toUpperCase() })}
+                {...sReg("destination", { setValueAs: (v: string) => v?.toUpperCase()?.trim() })}
                 placeholder="BOM — Mumbai"
                 maxLength={3}
                 className="uppercase font-mono text-base h-12"
@@ -373,7 +383,7 @@ export default function SearchPage() {
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <p className="text-sm font-semibold text-slate-700">
-              <span className="text-primary">{results.total}</span> flights found
+              <span className="text-primary">{results.total_results || results.results.length}</span> flights found
             </p>
             <SortBar sort={sort} setSort={setSort} />
           </div>
@@ -388,9 +398,9 @@ export default function SearchPage() {
             <div className="space-y-3">
               {sorted.map((r) => (
                 <FlightCard
-                  key={r.result_id}
+                  key={r.offer_id}
                   result={r}
-                  selected={selected?.result_id === r.result_id}
+                  selected={selected?.offer_id === r.offer_id}
                   onSelect={() => { setSelected(r); setTimeout(() => window.scrollTo({ top: 9999, behavior: "smooth" }), 100); }}
                 />
               ))}
@@ -407,7 +417,7 @@ export default function SearchPage() {
               <h3 className="font-semibold text-slate-800">Traveller Details</h3>
               {fields.length < adults && (
                 <Button type="button" size="sm" variant="outline"
-                  onClick={() => append({ type: "ADT", title: "Mr", first_name: "", last_name: "" })}
+                  onClick={() => append({ type: "ADT", title: "Mr", first_name: "", last_name: "", dob: "" })}
                   className="gap-1.5 text-xs">
                   <Plus className="h-3.5 w-3.5" /> Add Traveller
                 </Button>
@@ -433,9 +443,12 @@ export default function SearchPage() {
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <FormField label="Title">
                         <Select {...bReg(`passengers.${i}.title`)} options={[
-                          { value: "Mr", label: "Mr" }, { value: "Mrs", label: "Mrs" },
-                          { value: "Ms", label: "Ms" }, { value: "Master", label: "Master" },
+                          { value: "Mr", label: "Mr" },
+                          { value: "Mrs", label: "Mrs" },
+                          { value: "Ms", label: "Ms" },
                           { value: "Miss", label: "Miss" },
+                          { value: "Dr", label: "Dr" },
+                          { value: "Mstr", label: "Mstr" },
                         ]} />
                       </FormField>
                       <FormField label="First Name" error={pErr?.first_name?.message} required>
@@ -444,13 +457,18 @@ export default function SearchPage() {
                       <FormField label="Last Name" error={pErr?.last_name?.message} required>
                         <Input {...bReg(`passengers.${i}.last_name`)} placeholder="As in passport" />
                       </FormField>
-                      <FormField label="Date of Birth">
-                        <Input {...bReg(`passengers.${i}.dob`)} type="date" />
+                      <FormField label="Date of Birth" error={pErr?.dob?.message} required>
+                        <Input {...bReg(`passengers.${i}.dob`)} type="date" required />
                       </FormField>
                     </div>
-                    <FormField label="Passport No." hint="Required for international flights">
-                      <Input {...bReg(`passengers.${i}.passport_no`)} placeholder="P1234567" className="uppercase" />
-                    </FormField>
+                    <div className="grid grid-cols-2 gap-3">
+                      <FormField label="Passport No." error={pErr?.passport_no?.message} hint="Required for international flights">
+                        <Input {...bReg(`passengers.${i}.passport_no`)} placeholder="P1234567" className="uppercase" />
+                      </FormField>
+                      <FormField label="Nationality" error={pErr?.nationality?.message} hint="2-letter ISO country code (e.g. IN)">
+                        <Input {...bReg(`passengers.${i}.nationality`, { setValueAs: (v: string) => v?.toUpperCase()?.trim() })} placeholder="IN" maxLength={2} className="uppercase font-mono" />
+                      </FormField>
+                    </div>
                     <input type="hidden" {...bReg(`passengers.${i}.type`)} value="ADT" />
                   </div>
                 );
@@ -476,16 +494,15 @@ export default function SearchPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <p className="text-xs text-slate-500 mb-1">Total Fare · {fields.length} traveller{fields.length > 1 ? "s" : ""}</p>
-                <p className="text-3xl font-bold text-slate-900">₹{(totalFare / 100).toLocaleString("en-IN")}</p>
+                <p className="text-3xl font-bold text-slate-900">₹{totalFare.toLocaleString("en-IN")}</p>
                 <div className="flex gap-3 mt-1 text-xs text-slate-400 flex-wrap">
-                  <span>Base ₹{(selected.fare.base_fare / 100).toLocaleString("en-IN")}</span>
-                  <span>Taxes ₹{(selected.fare.taxes / 100).toLocaleString("en-IN")}</span>
-                  <span>Fees ₹{(selected.fare.fees / 100).toLocaleString("en-IN")}</span>
+                  <span>Class: {selected.travel_class}</span>
+                  <span>Refund: {selected.refundable ? "Yes" : "No"}</span>
                 </div>
-                {wallet && totalFare / 100 > wallet.balance / 100 && (
+                {wallet && totalFare > wallet.balance && (
                   <p className="mt-1.5 text-xs text-amber-600 flex items-center gap-1">
                     <AlertCircle className="h-3.5 w-3.5" />
-                    Wallet balance (₹{(wallet.balance / 100).toLocaleString("en-IN")}) is insufficient
+                    Wallet balance (₹{wallet.balance.toLocaleString("en-IN")}) is insufficient
                   </p>
                 )}
               </div>
@@ -506,16 +523,16 @@ export default function SearchPage() {
               <div className="rounded-xl bg-slate-50 p-4 text-sm space-y-2.5">
                 <div className="flex justify-between">
                   <span className="text-slate-500">Flight</span>
-                  <span className="font-semibold">{selected.segments[0].airline} {selected.segments[0].flight_number}</span>
+                  <span className="font-semibold">{selected.airline} {selected.flight_number}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Route</span>
-                  <span className="font-semibold">{selected.segments[0].origin} → {selected.segments[0].destination}</span>
+                  <span className="font-semibold">{selected.origin} → {selected.destination}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Date & Time</span>
                   <span className="font-semibold text-right">
-                    {fmtDate(selected.segments[0].departure_time)}, {fmtTime(selected.segments[0].departure_time)}
+                    {fmtDate(selected.departure_time)}, {fmtTime(selected.departure_time)}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -524,7 +541,7 @@ export default function SearchPage() {
                 </div>
                 <div className="flex justify-between border-t border-slate-200 pt-2.5 mt-1">
                   <span className="font-semibold text-slate-700">Total Amount</span>
-                  <span className="text-xl font-bold text-slate-900">₹{(totalFare / 100).toLocaleString("en-IN")}</span>
+                  <span className="text-xl font-bold text-slate-900">₹{totalFare.toLocaleString("en-IN")}</span>
                 </div>
               </div>
               <p className="text-xs text-slate-400 text-center leading-relaxed">

@@ -98,21 +98,21 @@ export default function AgentDashboardPage() {
           />
           <StatCard
             label="Wallet Balance"
-            value={`₹${((stats?.wallet_balance ?? 0) / 100).toLocaleString("en-IN")}`}
-            sub={stats?.credit_limit ? `Credit: ₹${(stats.credit_limit / 100).toLocaleString("en-IN")}` : undefined}
+            value={`₹{(stats?.wallet_balance ?? 0).toLocaleString("en-IN")}`}
+            sub={stats?.credit_limit ? `Credit: ₹${stats.credit_limit.toLocaleString("en-IN")}` : undefined}
             icon={Wallet}
             color="emerald"
           />
           <StatCard
             label="Revenue MTD"
-            value={`₹${((stats?.revenue_mtd ?? 0) / 100).toLocaleString("en-IN")}`}
+            value={`₹{(stats?.revenue_mtd ?? 0).toLocaleString("en-IN")}`}
             sub="This month"
             icon={TrendingUp}
             color="violet"
           />
           <StatCard
             label="Commission MTD"
-            value={`₹${((stats?.commission_mtd ?? 0) / 100).toLocaleString("en-IN")}`}
+            value={`₹{(stats?.commission_mtd ?? 0).toLocaleString("en-IN")}`}
             sub={`${stats?.pending_bookings ?? 0} pending`}
             icon={PlaneTakeoff}
             color="amber"
@@ -187,7 +187,7 @@ export default function AgentDashboardPage() {
                           {b.travel_date ? new Date(b.travel_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—"}
                         </td>
                         <td className="py-3 px-4 font-semibold text-slate-800">
-                          ₹{(b.total_amount / 100).toLocaleString("en-IN")}
+                          ₹{b.total_amount.toLocaleString("en-IN")}
                         </td>
                         <td className="py-3 px-4 last:pr-5">
                           <Badge variant={cfg.variant}>{cfg.label}</Badge>

@@ -93,10 +93,10 @@ export default function TransactionsPage() {
                           {t.transaction_ref}
                         </td>
                         <td className={cn("py-3 px-4 font-semibold whitespace-nowrap", isPositive ? "text-emerald-600" : "text-red-500")}>
-                          {cfg.sign}₹{(t.amount / 100).toLocaleString("en-IN")}
+                          {cfg.sign}₹{t.amount.toLocaleString("en-IN")}
                         </td>
                         <td className="py-3 px-4 text-slate-700 font-medium whitespace-nowrap">
-                          ₹{(t.balance_after / 100).toLocaleString("en-IN")}
+                          ₹{t.balance_after.toLocaleString("en-IN")}
                         </td>
                         <td className="py-3 px-4 last:pr-5 text-xs text-slate-400 whitespace-nowrap">
                           {new Date(t.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}

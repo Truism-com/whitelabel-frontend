@@ -3,9 +3,8 @@
 import { use, useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft, Download, XCircle, PlaneTakeoff, PlaneLanding,
-  User, Mail, Phone, Clock, CheckCircle2, MapPin,
-  Luggage, CreditCard, AlertCircle,
+  ArrowLeft, Download, XCircle, PlaneTakeoff,
+  User, Mail, Phone, MapPin, AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,20 +15,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCustomerBooking, useCancelBooking } from "@/lib/hooks/use-customer";
 import { customerApi } from "@/lib/api/customer";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils/cn";
-import type { BookingStatus } from "@/lib/types/customer.types";
-
-const STATUS_CFG: Record<BookingStatus, {
-  label: string; variant: "success" | "warning" | "destructive" | "secondary";
-  icon: React.ElementType; bg: string;
-}> = {
-  confirmed:  { label: "Confirmed",  variant: "success",     icon: CheckCircle2, bg: "bg-emerald-50 border-emerald-100" },
-  pending:    { label: "Pending",    variant: "warning",     icon: Clock,        bg: "bg-amber-50  border-amber-100" },
-  processing: { label: "Processing", variant: "warning",     icon: Clock,        bg: "bg-amber-50  border-amber-100" },
-  cancelled:  { label: "Cancelled",  variant: "destructive", icon: XCircle,      bg: "bg-red-50    border-red-100" },
-  refunded:   { label: "Refunded",   variant: "secondary",   icon: CheckCircle2, bg: "bg-slate-50  border-slate-200" },
-  failed:     { label: "Failed",     variant: "destructive", icon: XCircle,      bg: "bg-red-50    border-red-100" },
-};
+import { PageHeader } from "@/components/common/page-header";
+import { StatusBadge } from "@/components/common/status-badge";
 
 function fmtDT(iso: string, opts?: Intl.DateTimeFormatOptions) {
   return new Date(iso).toLocaleString("en-IN", opts ?? { dateStyle: "medium", timeStyle: "short" });
@@ -79,44 +66,48 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
     );
   }
 
-  const cfg      = STATUS_CFG[booking.status] ?? STATUS_CFG.pending;
   const canCancel = booking.status === "confirmed" || booking.status === "pending" || booking.status === "processing";
   const seg      = booking.segments?.[0];
 
   return (
     <div className="max-w-3xl mx-auto space-y-5">
-      {/* Back + actions bar */}
-      <div className="flex items-center justify-between">
+      {/* Back link */}
+      <div>
         <Link href="/my/bookings" className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors">
           <ArrowLeft className="h-4 w-4" /> My Bookings
         </Link>
-        <div className="flex gap-2">
-          {booking.ticket_url && (
-            <Button size="sm" variant="outline" onClick={handleDownload} isLoading={downloading} className="gap-1.5">
-              <Download className="h-3.5 w-3.5" /> Download Ticket
-            </Button>
-          )}
-          {canCancel && (
-            <Button size="sm" variant="outline" onClick={() => setShowCancel(true)}
-              className="gap-1.5 text-red-500 border-red-200 hover:bg-red-50">
-              <XCircle className="h-3.5 w-3.5" /> Cancel
-            </Button>
-          )}
-        </div>
       </div>
 
-      {/* Status banner */}
-      <div className={cn("rounded-2xl border p-5 flex items-center justify-between gap-3", cfg.bg)}>
-        <div className="flex items-center gap-3">
-          <cfg.icon className={cn("h-6 w-6", booking.status === "confirmed" ? "text-emerald-600" : booking.status === "cancelled" ? "text-red-500" : "text-amber-600")} />
-          <div>
-            <p className="font-bold text-slate-900">Booking {cfg.label}</p>
-            <p className="text-xs text-slate-500 font-mono mt-0.5">
-              Ref: {booking.booking_ref}{booking.pnr ? ` · PNR: ${booking.pnr}` : ""}
-            </p>
+      {/* Header */}
+      <PageHeader
+        title={booking.pnr ? `Booking PNR: ${booking.pnr}` : `Booking Reference`}
+        description={booking.booking_ref}
+        rightAction={
+          <div className="flex gap-2">
+            {booking.ticket_url && (
+              <Button size="sm" variant="outline" onClick={handleDownload} isLoading={downloading} className="gap-1.5">
+                <Download className="h-3.5 w-3.5" /> Download Ticket
+              </Button>
+            )}
+            {canCancel && (
+              <Button size="sm" variant="outline" onClick={() => setShowCancel(true)}
+                className="gap-1.5 text-red-500 border-red-200 hover:bg-red-50">
+                <XCircle className="h-3.5 w-3.5" /> Cancel
+              </Button>
+            )}
           </div>
+        }
+      />
+
+      {/* Status banner */}
+      <div className="rounded-2xl border border-slate-100 bg-white p-5 flex items-center justify-between gap-3">
+        <div>
+          <p className="font-bold text-slate-900">Booking Status</p>
+          <p className="text-xs text-slate-500 font-mono mt-0.5">
+            Ref: {booking.booking_ref}{booking.pnr ? ` · PNR: ${booking.pnr}` : ""}
+          </p>
         </div>
-        <Badge variant={cfg.variant} className="text-xs px-3 py-1">{cfg.label}</Badge>
+        <StatusBadge status={booking.status as any} />
       </div>
 
       {/* Flight info */}
@@ -245,21 +236,21 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               <>
                 <div className="flex justify-between text-slate-500">
                   <span>Base Fare</span>
-                  <span>₹{(booking.fare_breakdown.base_fare / 100).toLocaleString("en-IN")}</span>
+                  <span>₹{booking.fare_breakdown.base_fare.toLocaleString("en-IN")}</span>
                 </div>
                 <div className="flex justify-between text-slate-500">
                   <span>Taxes & Fees</span>
-                  <span>₹{((booking.fare_breakdown.taxes + booking.fare_breakdown.fees) / 100).toLocaleString("en-IN")}</span>
+                  <span>₹{(booking.fare_breakdown.taxes + booking.fare_breakdown.fees).toLocaleString("en-IN")}</span>
                 </div>
                 <div className="flex justify-between font-bold text-slate-900 pt-2 border-t border-slate-100">
                   <span>Total Paid</span>
-                  <span>₹{(booking.total_amount / 100).toLocaleString("en-IN")}</span>
+                  <span>₹{booking.total_amount.toLocaleString("en-IN")}</span>
                 </div>
               </>
             ) : (
               <div className="flex justify-between font-bold text-slate-900">
                 <span>Total Paid</span>
-                <span>₹{(booking.total_amount / 100).toLocaleString("en-IN")}</span>
+                <span>₹{booking.total_amount.toLocaleString("en-IN")}</span>
               </div>
             )}
           </div>
@@ -279,18 +270,18 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
           <div className="space-y-4">
             <div className="rounded-xl bg-red-50 border border-red-100 p-4 text-sm text-red-700">
               <p className="font-semibold mb-1">Are you sure you want to cancel?</p>
-              <p className="text-xs text-red-500">Refund eligibility depends on fare rules. Allow 5–7 business days.</p>
+              <p className="text-xs text-red-500">Refund eligibility depends on fare rules. Allow 5-7 business days.</p>
             </div>
-            <FormField label="Reason (optional)">
-              <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="Reason for cancellation…" />
+            <FormField label="Reason for Cancellation" error={reason.trim().length > 0 && reason.trim().length < 10 ? "Reason must be at least 10 characters long" : undefined} required>
+              <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="Reason for cancellation (min 10 characters)..." />
             </FormField>
           </div>
         </DialogBody>
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={() => setShowCancel(false)}>Keep Booking</Button>
-          <Button variant="destructive" size="sm" isLoading={cancel.isPending}
+          <Button variant="destructive" size="sm" isLoading={cancel.isPending} disabled={reason.trim().length < 10}
             onClick={async () => {
-              await cancel.mutateAsync({ id, reason: reason.trim() || undefined });
+              await cancel.mutateAsync({ id, reason: reason.trim() });
               setShowCancel(false);
             }}>
             Confirm Cancellation

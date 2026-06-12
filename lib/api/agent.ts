@@ -14,40 +14,51 @@ export const agentApi = {
   /* --- Dashboard --- */
   getStats: (): Promise<AgentStats> => {
     // The backend agent stats endpoint does not exist.
-    // Instead, we aggregate stats client-side via parallel calls to GET /wallet/summary and GET /bookings.
+    // Instead, we aggregate stats client-side via parallel calls to GET /wallet/ and GET /bookings.
     // We gracefully handle partial failures if either endpoint fails.
     const fetchWallet = apiClient
-      .get<any>("/wallet/summary")
+      .get<any>("/wallet/")
       .then((r) => r.data)
       .catch((err) => {
-        console.warn("Failed to fetch wallet summary for agent stats:", err);
+        console.warn("Failed to fetch wallet for agent stats:", err);
         return { balance: 0, credit_limit: 0 };
       });
 
     const fetchBookings = apiClient
-      .get<any>("/bookings", { params: { page: 1, page_size: 100 } })
+      .get<any>("/bookings", { params: { size: 50 } })
       .then((r) => r.data)
       .catch((err) => {
         console.warn("Failed to fetch bookings list for agent stats:", err);
-        return { items: [], total: 0 };
+        return { bookings: [], total: 0 };
       });
 
-    return Promise.all([fetchWallet, fetchBookings]).then(([walletSummary, bookingsResponse]) => {
-      // backend: WalletSummary
+    return Promise.all([fetchWallet, fetchBookings]).then(([walletResponse, bookingsResponse]) => {
+      // backend: WalletResponse
       // backend: BookingsResponse
-      const bookings = bookingsResponse.items ?? bookingsResponse.results ?? [];
+      const bookings = bookingsResponse.bookings ?? [];
 
       const total_bookings = bookings.length;
       const confirmed_bookings = bookings.filter((b: any) => b.status === "confirmed").length;
       const pending_bookings = bookings.filter((b: any) => b.status === "pending").length;
       const cancelled_bookings = bookings.filter((b: any) => b.status === "cancelled").length;
 
-      const confirmedList = bookings.filter((b: any) => b.status === "confirmed");
+      // revenue_mtd counts only confirmed bookings with travel_date in the current calendar month
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth();
+      const confirmedList = bookings.filter((b: any) => {
+        if (b.status !== "confirmed" || !b.travel_date) return false;
+        const travelDate = new Date(b.travel_date);
+        return travelDate.getFullYear() === currentYear && travelDate.getMonth() === currentMonth;
+      });
       const revenue_mtd = confirmedList.reduce((sum: number, b: any) => sum + (b.total_amount || 0), 0);
-      const commission_mtd = confirmedList.reduce((sum: number, b: any) => sum + (b.commission || 0), 0);
 
-      const wallet_balance = (walletSummary.balance || 0) * 100; // rupees to paise
-      const credit_limit = (walletSummary.credit_limit || 0) * 100; // rupees to paise
+      // commission_mtd is set to 0 per instructions
+      const commission_mtd = 0;
+
+      // balance and credit limit are kept as float rupees
+      const wallet_balance = walletResponse.balance ?? 0;
+      const credit_limit = walletResponse.credit_limit ?? 0;
 
       return {
         total_bookings,
@@ -85,7 +96,7 @@ export const agentApi = {
     const queryParams: any = {};
     if (params) {
       if (params.page) queryParams.page = params.page;
-      if (params.size) queryParams.page_size = params.size;
+      if (params.size) queryParams.size = params.size;
       if (params.status) queryParams.status = params.status;
       if (params.search) queryParams.search = params.search;
     }
@@ -94,40 +105,69 @@ export const agentApi = {
       .then((r) => {
         // backend: BookingsResponse
         const raw = r.data;
-        const results = raw.items ?? raw.results ?? [];
+        const bookings = raw.bookings ?? [];
+        const results = bookings.map((b: any) => ({
+          ...b,
+          id: `${b.type}:${b.booking_id}`,
+          booking_ref: b.booking_reference,
+        }));
         return { results, total: raw.total ?? results.length };
       });
   },
 
-  getBookingById: (id: string): Promise<AgentBooking> =>
-    apiClient.get<AgentBooking>(`/bookings/${id}`).then((r) => r.data),
+  getBookingById: (id: string): Promise<AgentBooking> => {
+    let booking_id = id;
+    if (id.includes(":")) {
+      booking_id = id.split(":")[1];
+    }
+    return apiClient.get<AgentBooking>(`/bookings/${booking_id}`).then((r) => r.data);
+  },
 
   createBooking: (data: CreateBookingRequest): Promise<AgentBooking> =>
-    apiClient.post<AgentBooking>("/bookings", data).then((r) => r.data),
+    apiClient.post<AgentBooking>("/bookings/flights", data).then((r) => r.data),
 
-  cancelBooking: (id: string, reason?: string): Promise<any> =>
-    apiClient.put(`/bookings/${id}/cancel`, { reason }).then((r) => r.data),
+  cancelBooking: (id: string, reason?: string): Promise<any> => {
+    let booking_id = id;
+    if (id.includes(":")) {
+      booking_id = id.split(":")[1];
+    }
+    return apiClient.put(`/bookings/${booking_id}/cancel`, { reason }).then((r) => r.data);
+  },
 
-  downloadTicket: (id: string): Promise<Blob> =>
-    apiClient
-      .get<Blob>(`/bookings/${id}/ticket`, { responseType: "blob" })
-      .then((r) => r.data),
+  downloadTicket: (id: string): Promise<Blob> => {
+    let booking_type = "flight";
+    let booking_id = id;
+    if (id.includes(":")) {
+      const parts = id.split(":");
+      booking_type = parts[0];
+      booking_id = parts[1];
+    }
+    if (booking_type !== "flight") {
+      throw new Error("NOT_FLIGHT");
+    }
+    return apiClient
+      .get<Blob>(`/dashboard/bookings/flight/${booking_id}/ticket`, { responseType: "blob" })
+      .then((r) => r.data);
+  },
 
   /* --- Wallet --- */
   getWallet: (): Promise<WalletSummary> =>
     apiClient.get<WalletSummary>("/wallet/").then((r) => r.data),
 
-  getTransactions: (params?: { page?: number; size?: number }): Promise<{ results: WalletTransaction[]; total: number }> =>
-    apiClient
-      .get<{ results?: WalletTransaction[]; items?: WalletTransaction[]; total?: number } | WalletTransaction[]>(
-        "/wallet/transactions",
-        { params }
-      )
+  getTransactions: (params?: { page?: number; size?: number }): Promise<{ results: WalletTransaction[]; total: number }> => {
+    const queryParams: any = {};
+    if (params) {
+      if (params.page) queryParams.page = params.page;
+      if (params.size) queryParams.size = params.size;
+    }
+    return apiClient
+      .get<any>("/wallet/transactions", { params: queryParams })
       .then((r) => {
         const raw = r.data;
-        if (Array.isArray(raw)) return { results: raw, total: raw.length };
-        return { results: raw.results ?? raw.items ?? [], total: raw.total ?? 0 };
-      }),
+        const transactions = raw.transactions ?? [];
+        return { results: transactions, total: raw.total ?? transactions.length };
+      });
+  },
 
   requestTopup: (data: TopupRequestPayload): Promise<any> =>
     apiClient.post("/wallet/topup/request", data).then((r) => r.data),

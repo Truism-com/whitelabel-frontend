@@ -6,7 +6,6 @@ import {
   XCircle, PlaneTakeoff, ArrowRight, MapPin, Download,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/hooks/use-auth";
@@ -15,15 +14,9 @@ import { customerApi } from "@/lib/api/customer";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils/cn";
 import type { BookingStatus, CustomerBooking } from "@/lib/types/customer.types";
+import { StatusBadge } from "@/components/common/status-badge";
 
-const STATUS_CFG: Record<BookingStatus, { label: string; variant: "success" | "warning" | "destructive" | "secondary"; icon: React.ElementType }> = {
-  confirmed:  { label: "Confirmed",  variant: "success",     icon: CheckCircle2 },
-  pending:    { label: "Pending",    variant: "warning",     icon: Clock },
-  processing: { label: "Processing", variant: "warning",     icon: Clock },
-  cancelled:  { label: "Cancelled",  variant: "destructive", icon: XCircle },
-  refunded:   { label: "Refunded",   variant: "secondary",   icon: CheckCircle2 },
-  failed:     { label: "Failed",     variant: "destructive", icon: XCircle },
-};
+
 
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
@@ -38,7 +31,6 @@ function daysUntil(dateStr: string) {
 
 function UpcomingCard({ trip }: { trip: CustomerBooking }) {
   const days = daysUntil(trip.travel_date);
-  const cfg  = STATUS_CFG[trip.status];
 
   const handleDownload = async () => {
     if (!trip.ticket_url) { toast.error("Ticket not ready yet."); return; }
@@ -54,7 +46,7 @@ function UpcomingCard({ trip }: { trip: CustomerBooking }) {
   };
 
   return (
-    <div className="rounded-2xl overflow-hidden border border-slate-200 bg-white hover:shadow-md transition-shadow">
+    <div className="rounded-2xl overflow-hidden border border-slate-200 bg-white hover:shadow-md hover:-translate-y-0.5 transition-all motion-reduce:transition-none duration-300 ease-in-out">
       {/* Colored header strip */}
       <div className={cn(
         "px-5 py-3 flex items-center justify-between",
@@ -66,7 +58,7 @@ function UpcomingCard({ trip }: { trip: CustomerBooking }) {
           <span className="text-xs font-semibold text-slate-600 font-mono">{trip.pnr ?? trip.booking_ref}</span>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant={cfg.variant} className="text-[10px]">{cfg.label}</Badge>
+          <StatusBadge status={trip.status as any} />
           {days > 0 && days <= 30 && (
             <span className="text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
               {days === 1 ? "Tomorrow" : `In ${days} days`}
@@ -132,8 +124,8 @@ export default function CustomerDashboard() {
   const STAT_CARDS = [
     { label: "Total Bookings",  value: stats?.total_bookings ?? 0,   suffix: "",  icon: CalendarCheck, color: "text-blue-600   bg-blue-50" },
     { label: "Upcoming Trips",  value: stats?.upcoming_trips ?? 0,   suffix: "",  icon: PlaneTakeoff,  color: "text-emerald-600 bg-emerald-50" },
-    { label: "Wallet Balance",  value: (stats?.wallet_balance ?? 0) / 100, prefix: "₹", icon: Wallet, color: "text-violet-600 bg-violet-50", format: "currency" },
-    { label: "Total Spent",     value: (stats?.total_spent ?? 0) / 100,    prefix: "₹", icon: ArrowRight, color: "text-amber-600  bg-amber-50",  format: "currency" },
+    { label: "Wallet Balance",  value: stats?.wallet_balance ?? 0, prefix: "₹", icon: Wallet, color: "text-violet-600 bg-violet-50", format: "currency" },
+    { label: "Total Spent",     value: stats?.total_spent ?? 0,    prefix: "₹", icon: ArrowRight, color: "text-amber-600  bg-amber-50",  format: "currency" },
   ];
 
   return (
@@ -226,7 +218,7 @@ export default function CustomerDashboard() {
             <Link
               key={href}
               href={href}
-              className={cn("rounded-2xl p-4 flex flex-col gap-2.5 hover:shadow-md transition-all", bg)}
+              className={cn("rounded-2xl p-4 flex flex-col gap-2.5 hover:shadow-md hover:-translate-y-0.5 transition-all motion-reduce:transition-none duration-300 ease-in-out", bg)}
             >
               <Icon className="h-5 w-5" />
               <div>

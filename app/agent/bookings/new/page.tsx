@@ -5,9 +5,8 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
-  PlaneTakeoff, PlaneLanding, Search, ArrowLeftRight,
-  Users, Clock, Luggage, ChevronDown, Plus, Trash2,
-  Check, AlertCircle, ArrowRight, RefreshCw,
+  PlaneTakeoff, PlaneLanding, Search,
+  Luggage, Plus, Trash2, Check, AlertCircle, ArrowRight, RefreshCw,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,8 +22,8 @@ import type { FlightResult, FlightSearchResponse } from "@/lib/types/agent.types
 
 /* ─── Search form schema ──────────────────────────────────────────── */
 const searchSchema = z.object({
-  origin:      z.string().min(3, "Required").max(3, "3-letter IATA code"),
-  destination: z.string().min(3, "Required").max(3, "3-letter IATA code"),
+  origin:      z.string().regex(/^[A-Z]{3}$/, "Must be exactly 3 uppercase letters (e.g. DEL)"),
+  destination: z.string().regex(/^[A-Z]{3}$/, "Must be exactly 3 uppercase letters (e.g. BOM)"),
   travel_date: z.string().min(1, "Select a date"),
   return_date: z.string().optional(),
   adults:      z.number().int().min(1).max(9),
@@ -37,12 +36,13 @@ type SearchForm = z.infer<typeof searchSchema>;
 
 /* ─── Booking form schema ─────────────────────────────────────────── */
 const passengerSchema = z.object({
-  type:       z.enum(["ADT", "CHD", "INF"]),
-  title:      z.enum(["Mr", "Mrs", "Ms", "Master", "Miss"]),
-  first_name: z.string().min(1, "Required"),
-  last_name:  z.string().min(1, "Required"),
-  dob:        z.string().optional(),
-  passport_no:z.string().optional(),
+  type:        z.enum(["ADT", "CHD", "INF"]),
+  title:       z.enum(["Mr", "Mrs", "Ms", "Miss", "Dr", "Mstr"]),
+  first_name:  z.string().min(2, "Must be 2-100 characters").max(100, "Must be 2-100 characters"),
+  last_name:   z.string().min(2, "Must be 2-100 characters").max(100, "Must be 2-100 characters"),
+  dob:         z.string().min(1, "Date of birth is required"),
+  passport_no: z.string().optional(),
+  nationality: z.string().length(2, "Must be a 2-letter ISO code (e.g. IN)").optional(),
 });
 
 const bookingSchema = z.object({
@@ -54,14 +54,22 @@ const bookingSchema = z.object({
 type BookingForm = z.infer<typeof bookingSchema>;
 
 /* ─── Helpers ────────────────────────────────────────────────────── */
-function fmtDuration(mins: number) {
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return `${h}h ${m > 0 ? `${m}m` : ""}`.trim();
-}
-
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+function parseDuration(duration: string): number {
+  try {
+    const hours = duration.match(/(\d+)h/);
+    const mins = duration.match(/(\d+)m/);
+    const h = hours ? parseInt(hours[1], 10) : 0;
+    const m = mins ? parseInt(mins[1], 10) : 0;
+    return h * 60 + m;
+  } catch {
+    return 0;
+  }
 }
 
 /* ─── Flight result card ─────────────────────────────────────────── */
@@ -70,7 +78,6 @@ function FlightCard({
 }: {
   result: FlightResult; selected: boolean; onSelect: () => void;
 }) {
-  const seg = result.segments[0];
   return (
     <button
       type="button"
@@ -87,44 +94,44 @@ function FlightCard({
             <PlaneTakeoff className="h-4 w-4 text-slate-400" />
           </div>
           <div>
-            <p className="font-semibold text-slate-900 text-sm">{seg.airline}</p>
-            <p className="text-xs text-slate-400 font-mono">{seg.flight_number}</p>
+            <p className="font-semibold text-slate-900 text-sm">{result.airline}</p>
+            <p className="text-xs text-slate-400 font-mono">{result.flight_number}</p>
           </div>
         </div>
 
         {/* Route + duration */}
         <div className="flex-1 flex items-center gap-3">
           <div className="text-center">
-            <p className="text-xl font-bold text-slate-900">{fmtTime(seg.departure_time)}</p>
-            <p className="text-xs font-semibold text-slate-500">{seg.origin}</p>
+            <p className="text-xl font-bold text-slate-900">{fmtTime(result.departure_time)}</p>
+            <p className="text-xs font-semibold text-slate-500">{result.origin}</p>
           </div>
           <div className="flex-1 flex flex-col items-center gap-1">
-            <p className="text-[10px] text-slate-400">{fmtDuration(seg.duration_minutes)}</p>
+            <p className="text-[10px] text-slate-400">{result.duration}</p>
             <div className="w-full flex items-center gap-1">
               <div className="flex-1 h-px bg-slate-200" />
               <PlaneTakeoff className="h-3 w-3 text-slate-400" />
               <div className="flex-1 h-px bg-slate-200" />
             </div>
-            <p className="text-[10px] text-slate-400">{seg.stops === 0 ? "Non-stop" : `${seg.stops} stop${seg.stops > 1 ? "s" : ""}`}</p>
+            <p className="text-[10px] text-slate-400">{result.stops === 0 ? "Non-stop" : `${result.stops} stop${result.stops > 1 ? "s" : ""}`}</p>
           </div>
           <div className="text-center">
-            <p className="text-xl font-bold text-slate-900">{fmtTime(seg.arrival_time)}</p>
-            <p className="text-xs font-semibold text-slate-500">{seg.destination}</p>
+            <p className="text-xl font-bold text-slate-900">{fmtTime(result.arrival_time)}</p>
+            <p className="text-xs font-semibold text-slate-500">{result.destination}</p>
           </div>
         </div>
 
         {/* Price + meta */}
         <div className="sm:text-right sm:w-36 shrink-0 flex sm:flex-col items-center sm:items-end justify-between gap-2">
           <div>
-            <p className="text-xl font-bold text-slate-900">₹{(result.fare.total / 100).toLocaleString("en-IN")}</p>
+            <p className="text-xl font-bold text-slate-900">₹{result.price.toLocaleString("en-IN")}</p>
             <p className="text-[11px] text-slate-400">per person</p>
           </div>
           <div className="flex flex-col items-end gap-1">
-            <Badge variant={result.is_refundable ? "success" : "secondary"} className="text-[10px]">
-              {result.is_refundable ? "Refundable" : "Non-refund"}
+            <Badge variant={result.refundable ? "success" : "secondary"} className="text-[10px]">
+              {result.refundable ? "Refundable" : "Non-refund"}
             </Badge>
             <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
-              <Luggage className="h-3 w-3" />{result.baggage_info ?? "15 kg"}
+              <Luggage className="h-3 w-3" />{result.baggage_allowance ?? "15 kg"}
             </span>
           </div>
         </div>
@@ -161,9 +168,12 @@ function PassengerRow({ index, register, errors, remove, canRemove }: {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <FormField label="Title" error={pErrors?.title?.message}>
           <Select {...register(`passengers.${index}.title`)} options={[
-            { value: "Mr", label: "Mr" }, { value: "Mrs", label: "Mrs" },
-            { value: "Ms", label: "Ms" }, { value: "Master", label: "Master" },
+            { value: "Mr", label: "Mr" },
+            { value: "Mrs", label: "Mrs" },
+            { value: "Ms", label: "Ms" },
             { value: "Miss", label: "Miss" },
+            { value: "Dr", label: "Dr" },
+            { value: "Mstr", label: "Mstr" },
           ]} />
         </FormField>
         <FormField label="First Name" error={pErrors?.first_name?.message} required>
@@ -172,13 +182,18 @@ function PassengerRow({ index, register, errors, remove, canRemove }: {
         <FormField label="Last Name" error={pErrors?.last_name?.message} required>
           <Input {...register(`passengers.${index}.last_name`)} placeholder="Last" />
         </FormField>
-        <FormField label="Date of Birth">
-          <Input {...register(`passengers.${index}.dob`)} type="date" />
+        <FormField label="Date of Birth" error={pErrors?.dob?.message} required>
+          <Input {...register(`passengers.${index}.dob`)} type="date" required />
         </FormField>
       </div>
-      <FormField label="Passport No." hint="Required for international">
-        <Input {...register(`passengers.${index}.passport_no`)} placeholder="e.g. P1234567" className="uppercase" />
-      </FormField>
+      <div className="grid grid-cols-2 gap-3">
+        <FormField label="Passport No." error={pErrors?.passport_no?.message} hint="Required for international">
+          <Input {...register(`passengers.${index}.passport_no`)} placeholder="e.g. P1234567" className="uppercase" />
+        </FormField>
+        <FormField label="Nationality" error={pErrors?.nationality?.message} hint="2-letter ISO country code (e.g. IN)">
+          <Input {...register(`passengers.${index}.nationality`, { setValueAs: (v: string) => v?.toUpperCase()?.trim() })} placeholder="IN" maxLength={2} className="uppercase font-mono" />
+        </FormField>
+      </div>
       <input type="hidden" {...register(`passengers.${index}.type`)} value="ADT" />
     </div>
   );
@@ -212,7 +227,7 @@ export default function NewBookingPage() {
   } = useForm<BookingForm>({
     resolver: zodResolver(bookingSchema),
     defaultValues: {
-      passengers: [{ type: "ADT", title: "Mr", first_name: "", last_name: "" }],
+      passengers: [{ type: "ADT", title: "Mr", first_name: "", last_name: "", dob: "" }],
     },
   });
   const { fields, append, remove } = useFieldArray({ control, name: "passengers" });
@@ -231,8 +246,19 @@ export default function NewBookingPage() {
     const vals = getValues();
     await createBooking.mutateAsync({
       search_id:     searchResults.search_id,
-      result_id:     selectedFlight.result_id,
-      passengers:    vals.passengers,
+      offer_id:      selectedFlight.offer_id,
+      passengers:    vals.passengers.map(p => ({
+        type: p.type,
+        title: p.title,
+        first_name: p.first_name,
+        last_name: p.last_name,
+        dob: p.dob,
+        passport_number: p.passport_no || undefined,
+        nationality: p.nationality || undefined,
+      })),
+      payment_details: {
+        method: "wallet",
+      },
       contact_email: vals.contact_email,
       contact_phone: vals.contact_phone,
       client_name:   vals.client_name,
@@ -244,7 +270,7 @@ export default function NewBookingPage() {
   };
 
   const totalFare = selectedFlight
-    ? selectedFlight.fare.total * (getValues("passengers")?.length || 1)
+    ? selectedFlight.price * (getValues("passengers")?.length || 1)
     : 0;
 
   return (
@@ -275,7 +301,7 @@ export default function NewBookingPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField label="From (IATA)" error={sErrors.origin?.message} required>
                 <Input
-                  {...sReg("origin", { setValueAs: (v: string) => v?.toUpperCase() })}
+                  {...sReg("origin", { setValueAs: (v: string) => v?.toUpperCase()?.trim() })}
                   placeholder="DEL"
                   maxLength={3}
                   className="uppercase font-mono"
@@ -284,7 +310,7 @@ export default function NewBookingPage() {
               </FormField>
               <FormField label="To (IATA)" error={sErrors.destination?.message} required>
                 <Input
-                  {...sReg("destination", { setValueAs: (v: string) => v?.toUpperCase() })}
+                  {...sReg("destination", { setValueAs: (v: string) => v?.toUpperCase()?.trim() })}
                   placeholder="BOM"
                   maxLength={3}
                   className="uppercase font-mono"
@@ -347,7 +373,7 @@ export default function NewBookingPage() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-slate-700">
-              {searchResults.total} flights found
+              {searchResults.total_results || searchResults.results.length} flights found
             </p>
             <p className="text-xs text-slate-400">Select a flight to continue</p>
           </div>
@@ -363,9 +389,9 @@ export default function NewBookingPage() {
           ) : (
             searchResults.results.map((r) => (
               <FlightCard
-                key={r.result_id}
+                key={r.offer_id}
                 result={r}
-                selected={selectedFlight?.result_id === r.result_id}
+                selected={selectedFlight?.offer_id === r.offer_id}
                 onSelect={() => {
                   setSelectedFlight(r);
                   setBookingStep("details");
@@ -387,7 +413,7 @@ export default function NewBookingPage() {
                   type="button"
                   size="sm"
                   variant="outline"
-                  onClick={() => append({ type: "ADT", title: "Mr", first_name: "", last_name: "" })}
+                  onClick={() => append({ type: "ADT", title: "Mr", first_name: "", last_name: "", dob: "" })}
                   className="gap-1.5 text-xs"
                 >
                   <Plus className="h-3.5 w-3.5" /> Add Passenger
@@ -430,16 +456,15 @@ export default function NewBookingPage() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <p className="text-xs text-slate-500 mb-1">Total Fare ({fields.length} passenger{fields.length > 1 ? "s" : ""})</p>
-                  <p className="text-2xl font-bold text-slate-900">₹{(totalFare / 100).toLocaleString("en-IN")}</p>
+                  <p className="text-2xl font-bold text-slate-900">₹{totalFare.toLocaleString("en-IN")}</p>
                   <div className="flex gap-3 mt-1 text-xs text-slate-400">
-                    <span>Base: ₹{(selectedFlight.fare.base_fare / 100).toLocaleString("en-IN")}</span>
-                    <span>Taxes: ₹{(selectedFlight.fare.taxes / 100).toLocaleString("en-IN")}</span>
-                    {selectedFlight.fare.markup ? <span>Markup: ₹{(selectedFlight.fare.markup / 100).toLocaleString("en-IN")}</span> : null}
+                    <span>Class: {selectedFlight.travel_class}</span>
+                    <span>Refund: {selectedFlight.refundable ? "Yes" : "No"}</span>
                   </div>
-                  {wallet && totalFare / 100 > wallet.balance / 100 && (
+                  {wallet && totalFare > wallet.balance && (
                     <p className="mt-1.5 text-xs text-amber-600 flex items-center gap-1">
                       <AlertCircle className="h-3.5 w-3.5" />
-                      Wallet balance (₹{(wallet.balance / 100).toLocaleString("en-IN")}) may be insufficient
+                      Wallet balance (₹{wallet.balance.toLocaleString("en-IN")}) may be insufficient
                     </p>
                   )}
                 </div>
@@ -461,15 +486,15 @@ export default function NewBookingPage() {
               <div className="rounded-xl bg-slate-50 p-4 space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-slate-500">Flight</span>
-                  <span className="font-semibold">{selectedFlight.segments[0].airline} {selectedFlight.segments[0].flight_number}</span>
+                  <span className="font-semibold">{selectedFlight.airline} {selectedFlight.flight_number}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Route</span>
-                  <span className="font-semibold">{selectedFlight.segments[0].origin} → {selectedFlight.segments[0].destination}</span>
+                  <span className="font-semibold">{selectedFlight.origin} → {selectedFlight.destination}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Departure</span>
-                  <span className="font-semibold">{new Date(selectedFlight.segments[0].departure_time).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</span>
+                  <span className="font-semibold">{new Date(selectedFlight.departure_time).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Passengers</span>
@@ -477,7 +502,7 @@ export default function NewBookingPage() {
                 </div>
                 <div className="flex justify-between border-t border-slate-200 pt-2 mt-2">
                   <span className="font-semibold text-slate-700">Total</span>
-                  <span className="font-bold text-lg text-slate-900">₹{(totalFare / 100).toLocaleString("en-IN")}</span>
+                  <span className="font-bold text-lg text-slate-900">₹{totalFare.toLocaleString("en-IN")}</span>
                 </div>
               </div>
               <p className="text-xs text-slate-400 text-center">Wallet will be debited. This action cannot be undone.</p>

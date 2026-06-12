@@ -85,10 +85,10 @@ function WalletBadge() {
   return (
     <div className="mx-3 mb-3 rounded-xl bg-gradient-to-br from-primary to-indigo-600 p-4 text-white">
       <p className="text-[10px] font-semibold uppercase tracking-widest opacity-70 mb-1">Wallet Balance</p>
-      <p className="text-xl font-bold">₹{(data.balance / 100).toLocaleString("en-IN")}</p>
+      <p className="text-xl font-bold">₹{data.balance.toLocaleString("en-IN")}</p>
       {data.credit_limit > 0 && (
         <p className="text-[11px] opacity-60 mt-0.5">
-          Credit: ₹{(data.credit_limit / 100).toLocaleString("en-IN")}
+          Credit: ₹{data.credit_limit.toLocaleString("en-IN")}
         </p>
       )}
     </div>

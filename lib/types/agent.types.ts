@@ -40,47 +40,58 @@ export interface FareBreakdown {
 }
 
 export interface FlightResult {
-  result_id:        string;
-  segments:         FlightSegment[];
-  cabin_class:      CabinClass;
-  fare:             FareBreakdown;
-  seats_available:  number;
-  is_refundable:    boolean;
-  baggage_info?:    string;
-  meal_included?:   boolean;
+  offer_id:         string;
+  airline:          string;
+  flight_number:    string;
+  origin:           string;
+  destination:      string;
+  departure_time:   string;       // ISO datetime
+  arrival_time:     string;       // ISO datetime
+  duration:         string;       // e.g. "3h 30m"
+  stops:            number;
+  aircraft?:        string;
+  price:            number;       // rupees float
+  currency:         string;
+  travel_class:     string;       // cabin class
+  baggage_allowance?: string;
+  refundable:       boolean;
 }
 
 export interface FlightSearchResponse {
-  search_id:   string;
-  results:     FlightResult[];
-  total:       number;
+  search_id:     string;
+  results:       FlightResult[];
+  total_results: number;
 }
 
-/* ─── Passengers ─────────────────────────────────────────────────── */
+/* --- Passengers --- */
 export type PassengerType = "ADT" | "CHD" | "INF";
 
 export interface Passenger {
-  type:         PassengerType;
-  title:        "Mr" | "Mrs" | "Ms" | "Master" | "Miss";
-  first_name:   string;
-  last_name:    string;
-  dob?:         string;           // YYYY-MM-DD
-  passport_no?: string;
-  nationality?: string;
+  type:             PassengerType;
+  title:            "Mr" | "Mrs" | "Ms" | "Miss" | "Dr" | "Mstr";
+  first_name:       string;
+  last_name:        string;
+  dob:              string;       // YYYY-MM-DD, REQUIRED
+  passport_number?: string;
+  nationality?:     string;       // 2-3 letter ISO country code
 }
 
-/* ─── Booking ─────────────────────────────────────────────────────── */
+/* --- Booking --- */
 export type BookingStatus =
   | "pending" | "confirmed" | "processing"
   | "cancelled" | "refunded" | "failed";
 
 export interface CreateBookingRequest {
-  search_id:    string;
-  result_id:    string;
-  passengers:   Passenger[];
+  search_id:     string;
+  offer_id:      string;
+  passengers:    Passenger[];
+  payment_details: {
+    method: string;
+  };
   contact_email: string;
   contact_phone: string;
-  client_name?:  string;         // name the booking is for
+  special_requests?: string;
+  client_name?:  string;
 }
 
 export interface AgentBooking {

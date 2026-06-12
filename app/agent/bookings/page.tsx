@@ -3,14 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  Plus, Search, Download, XCircle, Clock, CheckCircle2,
+  Plus, Search, Download, XCircle,
   PlaneTakeoff, ChevronLeft, ChevronRight, RefreshCw,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogHeader, DialogBody, DialogFooter } from "@/components/ui/dialog";
 import { FormField } from "@/components/ui/form-field";
@@ -19,16 +17,9 @@ import { useAgentBookings, useCancelBooking } from "@/lib/hooks/use-agent";
 import { agentApi } from "@/lib/api/agent";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils/cn";
-import type { AgentBooking, BookingStatus } from "@/lib/types/agent.types";
-
-const STATUS_CONFIG: Record<BookingStatus, { label: string; variant: "success" | "warning" | "destructive" | "secondary" }> = {
-  confirmed:  { label: "Confirmed",  variant: "success" },
-  pending:    { label: "Pending",    variant: "warning" },
-  processing: { label: "Processing", variant: "warning" },
-  cancelled:  { label: "Cancelled",  variant: "destructive" },
-  refunded:   { label: "Refunded",   variant: "secondary" },
-  failed:     { label: "Failed",     variant: "destructive" },
-};
+import type { AgentBooking } from "@/lib/types/agent.types";
+import { PageHeader } from "@/components/common/page-header";
+import { StatusBadge } from "@/components/common/status-badge";
 
 const PAGE_SIZE = 10;
 
@@ -44,7 +35,7 @@ function CancelDialog({
 
   const handleCancel = async () => {
     if (!booking) return;
-    await cancel.mutateAsync({ id: booking.id, reason: reason.trim() || undefined });
+    await cancel.mutateAsync({ id: booking.id, reason: reason.trim() });
     onClose();
   };
 
@@ -57,11 +48,11 @@ function CancelDialog({
             <p className="font-semibold">Cancel booking {booking?.pnr ?? booking?.booking_ref}?</p>
             <p className="text-xs mt-1 text-red-500">Refund eligibility depends on fare rules.</p>
           </div>
-          <FormField label="Reason (optional)">
+          <FormField label="Reason for Cancellation" error={reason.trim().length > 0 && reason.trim().length < 10 ? "Reason must be at least 10 characters long" : undefined} required>
             <Textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Reason for cancellation…"
+              placeholder="Reason for cancellation (min 10 characters)..."
               rows={3}
             />
           </FormField>
@@ -69,7 +60,7 @@ function CancelDialog({
       </DialogBody>
       <DialogFooter>
         <Button variant="outline" size="sm" onClick={onClose}>Back</Button>
-        <Button variant="destructive" size="sm" isLoading={cancel.isPending} onClick={handleCancel}>
+        <Button variant="destructive" size="sm" isLoading={cancel.isPending} disabled={reason.trim().length < 10} onClick={handleCancel}>
           Cancel Booking
         </Button>
       </DialogFooter>
@@ -77,24 +68,33 @@ function CancelDialog({
   );
 }
 
-export default function BookingsPage() {
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
+export default function AgentBookingsPage() {
+  const [page, setPage]           = useState(1);
+  const [status, setStatus]       = useState("");
+  const [search, setSearch]       = useState("");
   const [cancelTarget, setCancelTarget] = useState<AgentBooking | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const { data, isLoading, refetch, isFetching } = useAgentBookings({
-    page, size: PAGE_SIZE,
-    status:  status || undefined,
-    search:  search || undefined,
+    page,
+    size: PAGE_SIZE,
+    status: status || undefined,
+    search: search || undefined,
   });
 
   const bookings    = data?.results ?? [];
-  const total       = data?.total   ?? 0;
+  const total       = data?.total ?? 0;
   const totalPages  = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const handleDownload = async (booking: AgentBooking) => {
+    let booking_type = "flight";
+    if (booking.id.includes(":")) {
+      booking_type = booking.id.split(":")[0];
+    }
+    if (booking_type !== "flight") {
+      toast.error("Ticket download is only available for flight bookings.");
+      return;
+    }
     if (!booking.ticket_url) {
       toast.error("Ticket not available yet.");
       return;
@@ -118,17 +118,17 @@ export default function BookingsPage() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold text-slate-800">My Bookings</h2>
-          <p className="text-xs text-slate-400 mt-0.5">All flight bookings made by you</p>
-        </div>
-        <Link href="/agent/bookings/new">
-          <Button size="sm" className="gap-1.5">
-            <Plus className="h-3.5 w-3.5" />New Booking
-          </Button>
-        </Link>
-      </div>
+      <PageHeader
+        title="My Bookings"
+        description="All flight bookings made by you"
+        rightAction={
+          <Link href="/agent/bookings/new">
+            <Button size="sm" className="gap-1.5">
+              <Plus className="h-3.5 w-3.5" />New Booking
+            </Button>
+          </Link>
+        }
+      />
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-2">
@@ -172,13 +172,13 @@ export default function BookingsPage() {
                   ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-50">
                 {isLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <tr key={i} className="border-b border-slate-50">
-                      {Array.from({ length: 8 }).map((_, j) => (
-                        <td key={j} className="py-3 px-4 first:pl-5"><Skeleton className="h-4 w-20" /></td>
-                      ))}
+                  Array.from({ length: PAGE_SIZE }).map((_, i) => (
+                    <tr key={i}>
+                      <td colSpan={8} className="py-4 px-4 first:pl-5">
+                        <Skeleton className="h-6 w-full rounded-md" />
+                      </td>
                     </tr>
                   ))
                 ) : bookings.length === 0 ? (
@@ -190,7 +190,6 @@ export default function BookingsPage() {
                   </tr>
                 ) : (
                   bookings.map((b) => {
-                    const cfg = STATUS_CONFIG[b.status] ?? STATUS_CONFIG.pending;
                     const canCancel = b.status === "confirmed" || b.status === "pending" || b.status === "processing";
                     return (
                       <tr key={b.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
@@ -212,13 +211,13 @@ export default function BookingsPage() {
                           {b.travel_date ? new Date(b.travel_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}
                         </td>
                         <td className="py-3 px-4 font-semibold text-slate-800 whitespace-nowrap">
-                          ₹{(b.total_amount / 100).toLocaleString("en-IN")}
+                          ₹{b.total_amount.toLocaleString("en-IN")}
                         </td>
                         <td className="py-3 px-4 text-emerald-600 font-medium whitespace-nowrap">
-                          {b.commission ? `₹${(b.commission / 100).toLocaleString("en-IN")}` : "—"}
+                          {b.commission ? `₹${b.commission.toLocaleString("en-IN")}` : "—"}
                         </td>
                         <td className="py-3 px-4">
-                          <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                          <StatusBadge status={b.status as any} />
                         </td>
                         <td className="py-3 px-4 last:pr-5">
                           <div className="flex items-center gap-1.5">
@@ -248,39 +247,37 @@ export default function BookingsPage() {
               </tbody>
             </table>
           </div>
-
-          {/* Pagination */}
-          {total > PAGE_SIZE && (
-            <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100">
-              <p className="text-xs text-slate-400">
-                Showing {Math.min((page - 1) * PAGE_SIZE + 1, total)}–{Math.min(page * PAGE_SIZE, total)} of {total}
-              </p>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-40 transition-colors"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <span className="text-xs font-medium text-slate-600 px-2">{page} / {totalPages}</span>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-40 transition-colors"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-end gap-2 pt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+          </Button>
+          <span className="text-xs text-slate-500 px-2">Page {page} of {totalPages}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+          >
+            Next <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+      )}
+
+      {/* Cancel Confirmation Dialog */}
       <CancelDialog
         booking={cancelTarget}
         open={!!cancelTarget}
-        onClose={() => setCancelTarget(null)}
+        onClose={() => { setCancelTarget(null); refetch(); }}
       />
     </div>
   );
