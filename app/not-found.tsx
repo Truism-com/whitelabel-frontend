@@ -35,15 +35,12 @@ export default function NotFound() {
               <ArrowLeft className="h-4 w-4" />
               Go Back
             </Button>
-            <Button
-              asChild
-              className="flex-1 gap-2"
-            >
-              <Link href="/">
+            <Link href="/" className="flex-1">
+              <Button className="w-full gap-2">
                 <Home className="h-4 w-4" />
                 Home
-              </Link>
-            </Button>
+              </Button>
+            </Link>
           </div>
         </div>
       </div>

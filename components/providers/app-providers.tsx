@@ -22,7 +22,7 @@ export function AppProviders({ children, tenantConfig }: AppProvidersProps) {
 
   useEffect(() => {
     let pendingCount = 0;
-    let timer: NodeJS.Timeout | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
     const unsubscribe = clientEvents.subscribe((event) => {
       if (event === "request-start") {

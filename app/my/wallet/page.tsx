@@ -4,6 +4,10 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useQueryClient } from "@tanstack/react-query";
+import { walletApi, loadRazorpay } from "@/lib/api/wallet";
+import { parseApiError } from "@/lib/api/client";
+import { toast } from "sonner";
 import {
   Wallet, ArrowDownLeft, ArrowUpRight, Clock, CheckCircle2,
   Plus, AlertTriangle, ChevronLeft, ChevronRight, RefreshCw,
@@ -23,7 +27,7 @@ import type { WalletTransaction } from "@/lib/types/wallet.types";
 
 const topupSchema = z.object({
   amount:         z.number().min(100, "Minimum ₹100"),
-  payment_method: z.enum(["upi", "neft", "imps", "rtgs", "cheque", "cash"]),
+  payment_method: z.enum(["online", "upi", "neft", "imps", "rtgs", "cheque", "cash"]),
   reference:      z.string().optional(),
   notes:          z.string().optional(),
 });
@@ -40,14 +44,76 @@ const PAGE_SIZE = 10;
 
 function TopupDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const req = useRequestTopup();
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<TopupForm>({
+  const qc = useQueryClient();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<TopupForm>({
     resolver: zodResolver(topupSchema),
-    defaultValues: { payment_method: "upi" },
+    defaultValues: { payment_method: "online" },
   });
+  const method = watch("payment_method");
 
   const onSubmit = async (v: TopupForm) => {
-    await req.mutateAsync({ ...v, amount: v.amount });
-    reset(); onClose();
+    if (v.payment_method === "online") {
+      setIsProcessing(true);
+      try {
+        const orderData = await walletApi.initiateOnlineTopup(v.amount);
+        const scriptLoaded = await loadRazorpay();
+        if (!scriptLoaded) {
+          toast.error("Failed to load payment gateway script. Please try again.");
+          setIsProcessing(false);
+          return;
+        }
+
+        const options = {
+          key: orderData.key_id,
+          amount: orderData.amount,
+          currency: orderData.currency,
+          name: "TravelOS Wallet Topup",
+          description: `Topup Wallet Ref: ${orderData.topup_ref}`,
+          order_id: orderData.razorpay_order_id,
+          handler: async function (response: any) {
+            try {
+              await walletApi.verifyOnlineTopup({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              });
+              toast.success("Payment verified! Wallet topped up.");
+              qc.invalidateQueries({ queryKey: ["customer", "wallet"] });
+              qc.invalidateQueries({ queryKey: ["customer", "transactions"] });
+              onClose();
+              reset();
+            } catch (err) {
+              toast.error("Signature verification failed: " + parseApiError(err));
+            } finally {
+              setIsProcessing(false);
+            }
+          },
+          prefill: {
+            name: "",
+            email: "",
+            contact: "",
+          },
+          theme: {
+            color: "#4f46e5",
+          },
+          modal: {
+            ondismiss: function () {
+              setIsProcessing(false);
+            }
+          }
+        };
+
+        const rzp = new (window as any).Razorpay(options);
+        rzp.open();
+      } catch (err) {
+        toast.error("Initiation failed: " + parseApiError(err));
+        setIsProcessing(false);
+      }
+    } else {
+      await req.mutateAsync({ ...v, amount: v.amount });
+      reset(); onClose();
+    }
   };
 
   return (
@@ -55,12 +121,21 @@ function TopupDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
       <DialogHeader title="Add Money to Wallet" onClose={onClose} />
       <DialogBody>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="rounded-xl bg-amber-50 border border-amber-100 p-3.5 flex gap-2.5 text-sm text-amber-700">
-            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-            <p className="text-xs leading-relaxed">
-              Transfer the amount to our bank account first, then submit this form. Your wallet will be credited within 24 hours after verification.
-            </p>
-          </div>
+          {method === "online" ? (
+            <div className="rounded-xl bg-indigo-50 border border-indigo-100 p-3.5 flex gap-2.5 text-sm text-indigo-700">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <p className="text-xs leading-relaxed">
+                You will be redirected to the secure Razorpay payment gateway to complete your transaction instantly.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-xl bg-amber-50 border border-amber-100 p-3.5 flex gap-2.5 text-sm text-amber-700">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <p className="text-xs leading-relaxed">
+                Transfer the amount to our bank account first, then submit this form. Your wallet will be credited within 24 hours after verification.
+              </p>
+            </div>
+          )}
 
           {/* Quick amounts */}
           <div>
@@ -70,7 +145,7 @@ function TopupDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
                 <button
                   key={amt}
                   type="button"
-                  onClick={() => reset({ ...{ payment_method: "upi" as const }, amount: amt })}
+                  onClick={() => reset({ payment_method: method, amount: amt })}
                   className="py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors"
                 >
                   ₹{amt.toLocaleString("en-IN")}
@@ -85,6 +160,7 @@ function TopupDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
 
           <FormField label="Payment Method" required>
             <Select {...register("payment_method")} options={[
+              { value: "online", label: "Online Payment (Razorpay)" },
               { value: "upi",    label: "UPI" },
               { value: "neft",   label: "NEFT" },
               { value: "imps",   label: "IMPS" },
@@ -94,17 +170,21 @@ function TopupDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
             ]} />
           </FormField>
 
-          <FormField label="UTR / Reference No." hint="Transaction ID from your bank/UPI app">
-            <Input {...register("reference")} placeholder="e.g. UTR123456789012" />
-          </FormField>
+          {method !== "online" && (
+            <FormField label="UTR / Reference No." hint="Transaction ID from your bank/UPI app">
+              <Input {...register("reference")} placeholder="e.g. UTR123456789012" />
+            </FormField>
+          )}
 
           <FormField label="Notes (optional)">
-            <Textarea {...register("notes")} rows={2} placeholder="Any additional information…" />
+            <Textarea {...register("notes")} rows={2} placeholder="Any additional information..." />
           </FormField>
 
           <DialogFooter>
             <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-            <Button type="submit" size="sm" isLoading={req.isPending}>Submit Request</Button>
+            <Button type="submit" size="sm" isLoading={isProcessing || req.isPending}>
+              {method === "online" ? "Pay Now" : "Submit Request"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogBody>
@@ -142,7 +222,7 @@ export default function CustomerWalletPage() {
             : <p className="text-4xl font-bold mt-1">₹{(wallet?.balance ?? 0).toLocaleString("en-IN")}</p>
           }
           <p className="text-white/50 text-xs mt-1">
-            {wallet?.is_suspended ? "⛔ Wallet suspended — contact support" : "✓ Active"}
+            {wallet?.is_suspended ? "Suspended - contact support" : "Active"}
           </p>
           <div className="mt-5">
             <Button

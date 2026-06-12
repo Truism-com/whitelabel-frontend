@@ -4,6 +4,10 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useQueryClient } from "@tanstack/react-query";
+import { walletApi, loadRazorpay } from "@/lib/api/wallet";
+import { parseApiError } from "@/lib/api/client";
+import { toast } from "sonner";
 import {
   Wallet, ArrowDownLeft, ArrowUpRight, Plus, Clock,
   CheckCircle2, XCircle, AlertTriangle,
@@ -24,7 +28,7 @@ import type { WalletTransaction } from "@/lib/types/wallet.types";
 /* ─── Topup schema ────────────────────────────────────────────────── */
 const topupSchema = z.object({
   amount:         z.number().min(100, "Minimum ₹100"),
-  payment_method: z.enum(["upi", "neft", "imps", "rtgs", "cheque", "cash"]),
+  payment_method: z.enum(["online", "upi", "neft", "imps", "rtgs", "cheque", "cash"]),
   reference:      z.string().optional(),
   notes:          z.string().optional(),
 });
@@ -33,15 +37,77 @@ type TopupForm = z.infer<typeof topupSchema>;
 /* ─── Topup dialog ────────────────────────────────────────────────── */
 function TopupDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const requestTopup = useRequestTopup();
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<TopupForm>({
+  const qc = useQueryClient();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<TopupForm>({
     resolver: zodResolver(topupSchema),
-    defaultValues: { payment_method: "upi" },
+    defaultValues: { payment_method: "online" },
   });
+  const method = watch("payment_method");
 
   const onSubmit = async (v: TopupForm) => {
-    await requestTopup.mutateAsync({ ...v, amount: v.amount });
-    reset();
-    onClose();
+    if (v.payment_method === "online") {
+      setIsProcessing(true);
+      try {
+        const orderData = await walletApi.initiateOnlineTopup(v.amount);
+        const scriptLoaded = await loadRazorpay();
+        if (!scriptLoaded) {
+          toast.error("Failed to load payment gateway script. Please try again.");
+          setIsProcessing(false);
+          return;
+        }
+
+        const options = {
+          key: orderData.key_id,
+          amount: orderData.amount,
+          currency: orderData.currency,
+          name: "TravelOS Wallet Topup",
+          description: `Topup Wallet Ref: ${orderData.topup_ref}`,
+          order_id: orderData.razorpay_order_id,
+          handler: async function (response: any) {
+            try {
+              await walletApi.verifyOnlineTopup({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              });
+              toast.success("Payment verified! Wallet topped up.");
+              qc.invalidateQueries({ queryKey: ["agent", "wallet"] });
+              qc.invalidateQueries({ queryKey: ["agent", "transactions"] });
+              onClose();
+              reset();
+            } catch (err) {
+              toast.error("Signature verification failed: " + parseApiError(err));
+            } finally {
+              setIsProcessing(false);
+            }
+          },
+          prefill: {
+            name: "",
+            email: "",
+            contact: "",
+          },
+          theme: {
+            color: "#4f46e5",
+          },
+          modal: {
+            ondismiss: function () {
+              setIsProcessing(false);
+            }
+          }
+        };
+
+        const rzp = new (window as any).Razorpay(options);
+        rzp.open();
+      } catch (err) {
+        toast.error("Initiation failed: " + parseApiError(err));
+        setIsProcessing(false);
+      }
+    } else {
+      await requestTopup.mutateAsync({ ...v, amount: v.amount });
+      reset();
+      onClose();
+    }
   };
 
   return (
@@ -49,10 +115,17 @@ function TopupDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
       <DialogHeader title="Request Wallet Top-up" onClose={onClose} />
       <DialogBody>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 flex gap-2.5 text-sm text-amber-700">
-            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-            <p>Top-up requests are reviewed by admin within 24 hours. Transfer the amount first, then submit this form.</p>
-          </div>
+          {method === "online" ? (
+            <div className="rounded-xl bg-indigo-50 border border-indigo-100 p-3 flex gap-2.5 text-sm text-indigo-700">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <p>You will be redirected to the secure Razorpay payment gateway to complete your transaction instantly.</p>
+            </div>
+          ) : (
+            <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 flex gap-2.5 text-sm text-amber-700">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <p>Top-up requests are reviewed by admin within 24 hours. Transfer the amount first, then submit this form.</p>
+            </div>
+          )}
 
           <FormField label="Amount (₹)" error={errors.amount?.message} required>
             <Input
@@ -65,6 +138,7 @@ function TopupDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
 
           <FormField label="Payment Method" required>
             <Select {...register("payment_method")} options={[
+              { value: "online", label: "Online Payment (Razorpay)" },
               { value: "upi",    label: "UPI" },
               { value: "neft",   label: "NEFT" },
               { value: "imps",   label: "IMPS" },
@@ -74,17 +148,21 @@ function TopupDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
             ]} />
           </FormField>
 
-          <FormField label="UTR / Reference No." hint="Transaction reference from your bank">
-            <Input {...register("reference")} placeholder="e.g. UTR123456789012" />
-          </FormField>
+          {method !== "online" && (
+            <FormField label="UTR / Reference No." hint="Transaction reference from your bank">
+              <Input {...register("reference")} placeholder="e.g. UTR123456789012" />
+            </FormField>
+          )}
 
           <FormField label="Notes (optional)">
-            <Textarea {...register("notes")} placeholder="Any additional info for admin…" rows={2} />
+            <Textarea {...register("notes")} placeholder="Any additional info for admin..." rows={2} />
           </FormField>
 
           <DialogFooter>
             <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-            <Button type="submit" size="sm" isLoading={requestTopup.isPending}>Submit Request</Button>
+            <Button type="submit" size="sm" isLoading={isProcessing || requestTopup.isPending}>
+              {method === "online" ? "Pay Now" : "Submit Request"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogBody>

@@ -22,6 +22,8 @@ const schema = z.object({
   value:       z.number().min(0, "Must be ≥ 0"),
   applies_to:  z.string().min(1, "Required"),
   is_active:   z.boolean(),
+  min_markup:  z.preprocess((val) => (val === "" || val === undefined || val === null ? undefined : Number(val)), z.number().min(0, "Must be ≥ 0").optional()),
+  max_markup:  z.preprocess((val) => (val === "" || val === undefined || val === null ? undefined : Number(val)), z.number().min(0, "Must be ≥ 0").optional()),
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -38,6 +40,8 @@ function toFormValues(r: MarkupRule): FormValues {
     value:       r.value ?? r.markup_value ?? 0,
     applies_to:  r.applies_to ?? r.route ?? r.airline ?? "all",
     is_active:   r.is_active,
+    min_markup:  r.min_markup,
+    max_markup:  r.max_markup,
   };
 }
 
@@ -66,6 +70,14 @@ function RuleForm({ defaultValues, onSubmit, onCancel, isPending }: {
         </FormField>
         <FormField label="Value" error={errors.value?.message} required>
           <Input {...register("value", { valueAsNumber: true })} type="number" step="0.01" placeholder="0.00" />
+        </FormField>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <FormField label="Min Markup Limit (₹)" error={errors.min_markup?.message}>
+          <Input {...register("min_markup", { valueAsNumber: true })} type="number" step="0.01" placeholder="None" />
+        </FormField>
+        <FormField label="Max Markup Limit (₹)" error={errors.max_markup?.message}>
+          <Input {...register("max_markup", { valueAsNumber: true })} type="number" step="0.01" placeholder="None" />
         </FormField>
       </div>
       <FormField label="Applies To" error={errors.applies_to?.message} required>
@@ -121,7 +133,7 @@ export default function MarkupRulesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100">
-                  {["Name", "Type", "Value", "Applies To", "Status", "Actions"].map(h => (
+                  {["Name", "Type", "Value", "Limits (Min/Max)", "Applies To", "Status", "Actions"].map(h => (
                     <th key={h} className="text-left text-xs font-medium text-slate-400 uppercase tracking-wide py-3 px-4 first:pl-5 last:pr-5">{h}</th>
                   ))}
                 </tr>
@@ -130,13 +142,13 @@ export default function MarkupRulesPage() {
                 {isLoading ? (
                   Array.from({ length: 3 }).map((_, i) => (
                     <tr key={i} className="border-b border-slate-50">
-                      {Array.from({ length: 6 }).map((_, j) => (
+                      {Array.from({ length: 7 }).map((_, j) => (
                         <td key={j} className="py-3 px-4 first:pl-5"><Skeleton className="h-4 w-24" /></td>
                       ))}
                     </tr>
                   ))
                 ) : rules.length === 0 ? (
-                  <tr><td colSpan={6} className="text-center text-slate-400 py-12">No markup rules yet. Create one.</td></tr>
+                  <tr><td colSpan={7} className="text-center text-slate-400 py-12">No markup rules yet. Create one.</td></tr>
                 ) : (
                   rules.map((r) => {
                     const val = r.value ?? r.markup_value ?? 0;
@@ -147,6 +159,16 @@ export default function MarkupRulesPage() {
                         <td className="py-3 px-4 capitalize text-slate-600">{type}</td>
                         <td className="py-3 px-4 font-medium text-slate-800">
                           {type === "percentage" ? `${val}%` : `₹${val}`}
+                        </td>
+                        <td className="py-3 px-4 text-slate-600 text-xs">
+                          {r.min_markup !== undefined || r.max_markup !== undefined ? (
+                            <span>
+                              {r.min_markup !== undefined && r.min_markup !== null ? `Min: ₹${r.min_markup}` : "—"} /{" "}
+                              {r.max_markup !== undefined && r.max_markup !== null ? `Max: ₹${r.max_markup}` : "—"}
+                            </span>
+                          ) : (
+                            "—"
+                          )}
                         </td>
                         <td className="py-3 px-4 capitalize text-slate-600">{r.applies_to ?? r.route ?? r.airline ?? "All"}</td>
                         <td className="py-3 px-4"><Badge variant={r.is_active ? "success" : "secondary"}>{r.is_active ? "Active" : "Inactive"}</Badge></td>

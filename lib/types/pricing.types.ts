@@ -11,6 +11,11 @@ export interface MarkupRule {
   route?: string;
   travel_class?: string;
   is_active: boolean;
+  min_markup?: number;
+  max_markup?: number;
+  min_fare?: number;
+  max_fare?: number;
+  user_type?: string;
   created_at: string;
 }
 
