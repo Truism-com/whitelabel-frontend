@@ -6,19 +6,29 @@ import { customerApi } from "@/lib/api/customer";
 import { parseApiError } from "@/lib/api/client";
 import type { CreateBookingRequest, FlightSearchParams } from "@/lib/types/agent.types";
 
-/* ── Dashboard ── */
+/* --- Dashboard --- */
+const fetchDashboardSummary = async () => {
+  const [stats, upcoming] = await Promise.all([
+    customerApi.getStats(),
+    customerApi.getUpcomingTrips(),
+  ]);
+  return { stats, upcoming };
+};
+
 export function useCustomerStats() {
   return useQuery({
-    queryKey: ["customer", "stats"],
-    queryFn:  customerApi.getStats,
+    queryKey: ["dashboard-summary"],
+    queryFn:  fetchDashboardSummary,
+    select:   (data) => data.stats,
     refetchInterval: 60_000,
   });
 }
 
 export function useUpcomingTrips() {
   return useQuery({
-    queryKey: ["customer", "upcoming"],
-    queryFn:  customerApi.getUpcomingTrips,
+    queryKey: ["dashboard-summary"],
+    queryFn:  fetchDashboardSummary,
+    select:   (data) => data.upcoming,
   });
 }
 
@@ -52,8 +62,7 @@ export function useCreateBooking() {
     mutationFn: (data: CreateBookingRequest) => customerApi.createBooking(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customer", "bookings"] });
-      qc.invalidateQueries({ queryKey: ["customer", "stats"] });
-      qc.invalidateQueries({ queryKey: ["customer", "upcoming"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-summary"] });
       toast.success("Booking confirmed! Check your email for the e-ticket.");
     },
     onError: (e) => toast.error(parseApiError(e)),
@@ -67,8 +76,7 @@ export function useCancelBooking() {
       customerApi.cancelBooking(id, reason),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customer", "bookings"] });
-      qc.invalidateQueries({ queryKey: ["customer", "stats"] });
-      qc.invalidateQueries({ queryKey: ["customer", "upcoming"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-summary"] });
       toast.success("Booking cancelled.");
     },
     onError: (e) => toast.error(parseApiError(e)),

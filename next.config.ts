@@ -6,13 +6,19 @@ const BACKEND_URL =
 
 const backendPrefixes = [
   "auth",
-  "admin",
-  "agent",
-  "flights",
+  "search",
   "bookings",
   "wallet",
   "cms",
-  "customer",
+  "admin",
+  "dashboard",
+  "payments",
+  "pricing",
+  "settings",
+  "files",
+  "v1",
+  "superadmin",
+  "health",
 ];
 
 const nextConfig: NextConfig = {

@@ -5,10 +5,9 @@ import axios, {
 } from "axios";
 import type { ApiError } from "@/lib/types/api.types";
 
-const BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
-/* ─── Token helpers (browser-only) ─────────────────────────────── */
+/* --- Token helpers (browser-only) ------------------------------- */
 const storage = {
   getAccess: () =>
     typeof window !== "undefined"
@@ -26,7 +25,7 @@ const storage = {
   },
 };
 
-/* ─── Queue management for concurrent 401 retries ──────────────── */
+/* --- Queue management for concurrent 401 retries ---------------- */
 type QueueEntry = {
   resolve: (token: string) => void;
   reject: (err: unknown) => void;
@@ -42,16 +41,42 @@ function drainQueue(err: unknown, token: string | null) {
   queue = [];
 }
 
-/* ─── Axios instance ────────────────────────────────────────────── */
+let coldStartDone = false;
+
+// Custom Event Emitter to track request states for the cold start overlay
+type ClientEvent = "request-start" | "response-received";
+type ClientListener = (event: ClientEvent) => void;
+const listeners = new Set<ClientListener>();
+
+export const clientEvents = {
+  subscribe(listener: ClientListener) {
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  },
+  emit(event: ClientEvent) {
+    listeners.forEach((l) => l(event));
+  },
+};
+
+/* --- Axios instance ---------------------------------------------- */
 export const apiClient: AxiosInstance = axios.create({
-  baseURL: BASE_URL,
+  baseURL: "",
   timeout: 30_000,
   headers: { "Content-Type": "application/json" },
 });
 
-/* ─── Request interceptor — attach JWT + tenant header ─────────── */
+/* --- Request interceptor - attach JWT + tenant header ----------- */
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    if (!coldStartDone) {
+      config.timeout = 90000;
+      clientEvents.emit("request-start");
+    } else {
+      config.timeout = 30000;
+    }
+
     const token = storage.getAccess();
     if (token) config.headers.Authorization = `Bearer ${token}`;
 
@@ -67,16 +92,26 @@ apiClient.interceptors.request.use(
   (err) => Promise.reject(err)
 );
 
-/* ─── Response interceptor — silent token refresh on 401 ────────── */
+/* --- Response interceptor - silent token refresh on 401 ---------- */
 apiClient.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    if (!coldStartDone) {
+      coldStartDone = true;
+      clientEvents.emit("response-received");
+    }
+    return res;
+  },
   async (error: AxiosError) => {
+    if (!coldStartDone) {
+      clientEvents.emit("response-received");
+    }
+
     const original = error.config as InternalAxiosRequestConfig & {
       _retry?: boolean;
     };
 
     if (error.response?.status !== 401 || original._retry) {
-      return Promise.reject(parseApiError(error));
+      return Promise.reject(error);
     }
 
     if (isRefreshing) {
@@ -95,7 +130,7 @@ apiClient.interceptors.response.use(
       const refresh = storage.getRefresh();
       if (!refresh) throw new Error("No refresh token");
 
-      const { data } = await axios.post(`${BASE_URL}/auth/refresh`, {
+      const { data } = await axios.post(`/auth/refresh`, {
         refresh_token: refresh,
       });
 

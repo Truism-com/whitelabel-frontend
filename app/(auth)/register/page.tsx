@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import axios from "axios";
 import {
   Eye, EyeOff, Mail, Lock, User, Phone,
   Building2, CreditCard, Plane, ArrowRight, ArrowLeft,
@@ -27,9 +28,14 @@ const schema = z.object({
   email:           z.string().min(1, "Email is required").email("Enter a valid email"),
   phone:           z.string().optional(),
   address:         z.string().optional(),
-  password:        z.string().min(8, "Min 8 chars").regex(/[A-Z]/, "Need uppercase").regex(/[0-9]/, "Need number"),
+  password:        z.string()
+    .min(8, "Password must be at least 8 characters long")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+    .regex(/[0-9]/, "Password must contain at least one digit")
+    .regex(/[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/, "Password must contain at least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)"),
   confirmPassword: z.string().min(1, "Confirm password"),
-  role:            z.enum(["customer", "agent", "admin"]),
+  role:            z.enum(["customer", "agent"]),
   company_name:    z.string().optional(),
   pan_number:      z.string().optional(),
   terms:           z.literal(true, { message: "You must accept the terms" }),
@@ -38,13 +44,24 @@ const schema = z.object({
     message: "Passwords do not match",
     path: ["confirmPassword"],
   })
-  .refine(
-    (d) =>
-      !d.pan_number ||
-      d.pan_number.trim() === "" ||
-      /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(d.pan_number),
-    { message: "Enter a valid PAN", path: ["pan_number"] }
-  );
+  .superRefine((data, ctx) => {
+    if (data.role === "agent") {
+      if (!data.company_name || data.company_name.trim().length < 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Agency Name is required and must be at least 2 characters",
+          path: ["company_name"],
+        });
+      }
+      if (!data.pan_number || !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(data.pan_number)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "PAN number is required and must match ABCDE1234F",
+          path: ["pan_number"],
+        });
+      }
+    }
+  });
 
 type FormValues = z.infer<typeof schema>;
 
@@ -97,18 +114,30 @@ export default function RegisterPage() {
   const [step, setStep]                 = useState<1 | 2>(1);
   const [showPassword, setShowPassword] = useState(false);
   const [apiError, setApiError]         = useState<string | null>(null);
+  const [selectedCard, setSelectedCard] = useState<AccountType>("customer");
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   
   const { register: doRegister, isLoading } = useAuth();
 
   const {
-    register, handleSubmit, watch, setValue, trigger,
+    register, handleSubmit, watch, setValue, trigger, setError,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { role: "admin" }, // Defaulting to admin to guide B2B users
+    defaultValues: { role: "customer" },
   });
 
+  const { ref: passwordRef, onBlur: passwordOnBlur, ...passwordRegister } = register("password");
   const selectedRole = watch("role") as AccountType;
+  const passwordValue = watch("password") || "";
+
+  const passwordRules = [
+    { label: "At least 8 characters", valid: passwordValue.length >= 8 },
+    { label: "At least one uppercase letter (A-Z)", valid: /[A-Z]/.test(passwordValue) },
+    { label: "At least one lowercase letter (a-z)", valid: /[a-z]/.test(passwordValue) },
+    { label: "At least one digit (0-9)", valid: /[0-9]/.test(passwordValue) },
+    { label: "At least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)", valid: /[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/.test(passwordValue) },
+  ];
 
   // Handles moving to Step 2
   const handleNextStep = async () => {
@@ -125,9 +154,36 @@ export default function RegisterPage() {
       const { confirmPassword: _cp, terms: _t, ...payload } = values;
       if (!payload.pan_number?.trim()) delete payload.pan_number;
       if (!payload.address?.trim())    delete payload.address;
-      await doRegister(payload as Parameters<typeof doRegister>[0]);
+      if (payload.role !== "agent") {
+        delete payload.company_name;
+        delete payload.pan_number;
+      }
+      await doRegister(payload as any, values.password);
     } catch (err) {
-      setApiError((err as Error).message);
+      if (axios.isAxiosError(err) && err.response?.status === 422) {
+        const detail = err.response.data?.detail;
+        if (Array.isArray(detail)) {
+          let generalErrors: string[] = [];
+          detail.forEach((item: any) => {
+            const fieldName = item.loc && item.loc.length > 0 ? item.loc[item.loc.length - 1] : null;
+            if (fieldName && fieldName in values) {
+              setError(fieldName as any, { message: item.msg });
+            } else {
+              generalErrors.push(item.msg);
+            }
+          });
+          if (generalErrors.length > 0) {
+            setApiError(generalErrors.join(", "));
+          }
+        } else if (typeof detail === "string") {
+          setApiError(detail);
+        } else {
+          setApiError("Validation error occurred");
+        }
+      } else {
+        const msg = (err as any).response?.data?.detail || (err as any).message || "An unexpected error occurred";
+        setApiError(typeof msg === "string" ? msg : JSON.stringify(msg));
+      }
     }
   }
 
@@ -153,7 +209,7 @@ export default function RegisterPage() {
     },
   };
 
-  const panel = PANEL_PROPS[selectedRole];
+  const panel = PANEL_PROPS[selectedCard];
 
   return (
     <>
@@ -193,31 +249,43 @@ export default function RegisterPage() {
                   icon={Building2}
                   title="Register a Business"
                   description="I want to launch a white-label booking website and manage an agency."
-                  selected={selectedRole === "admin"}
-                  onSelect={() => setValue("role", "admin")}
+                  selected={selectedCard === "admin"}
+                  onSelect={() => setSelectedCard("admin")}
                 />
                 <RoleCard
                   icon={Users}
                   title="Join as an Agent"
                   description="I want to book flights for my clients and earn commissions."
-                  selected={selectedRole === "agent"}
-                  onSelect={() => setValue("role", "agent")}
+                  selected={selectedCard === "agent"}
+                  onSelect={() => {
+                    setSelectedCard("agent");
+                    setValue("role", "agent");
+                  }}
                 />
                 <RoleCard
                   icon={Star}
                   title="Personal Account"
                   description="I just want to search and book flights for myself."
-                  selected={selectedRole === "customer"}
-                  onSelect={() => setValue("role", "customer")}
+                  selected={selectedCard === "customer"}
+                  onSelect={() => {
+                    setSelectedCard("customer");
+                    setValue("role", "customer");
+                  }}
                 />
               </div>
 
-              <Button 
-                onClick={handleNextStep} 
-                className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-lg shadow-slate-900/20 transition-all duration-300 h-14 text-base"
-              >
-                Continue <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
+              {selectedCard === "admin" ? (
+                <Alert variant="info" className="mb-8">
+                  To set up a white-label business portal, contact us at hello@trurism.com
+                </Alert>
+              ) : (
+                <Button 
+                  onClick={handleNextStep} 
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-lg shadow-slate-900/20 transition-all duration-300 h-14 text-base"
+                >
+                  Continue <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              )}
 
               <p className="mt-8 text-center text-sm text-slate-500">
                 Already have an account?{" "}
@@ -266,25 +334,6 @@ export default function RegisterPage() {
                     error={!!errors.email} leftIcon={<Mail className="h-4 w-4 text-slate-400" />} {...register("email")} />
                 </FormField>
 
-                {/* Conditional Fields: Admin */}
-                {selectedRole === "admin" && (
-                  <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 space-y-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <ShieldCheck className="h-4 w-4 text-blue-600" />
-                      <p className="text-sm font-bold text-slate-900 tracking-tight">Business Info</p>
-                    </div>
-                    <FormField label="Company Name" htmlFor="company_name" error={errors.company_name?.message}>
-                      <Input id="company_name" placeholder="TravelEase Pvt. Ltd."
-                        leftIcon={<Building2 className="h-4 w-4 text-slate-400" />} {...register("company_name")} />
-                    </FormField>
-                    <FormField label="PAN Number" htmlFor="pan_number" error={errors.pan_number?.message} hint="Required for GST invoicing">
-                      <Input id="pan_number" placeholder="ABCDE1234F" maxLength={10} className="uppercase"
-                        leftIcon={<CreditCard className="h-4 w-4 text-slate-400" />}
-                        {...register("pan_number", { setValueAs: (v: string) => v?.toUpperCase() })} />
-                    </FormField>
-                  </div>
-                )}
-
                 {/* Conditional Fields: Agent */}
                 {selectedRole === "agent" && (
                   <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 space-y-4">
@@ -292,9 +341,14 @@ export default function RegisterPage() {
                       <Users className="h-4 w-4 text-blue-600" />
                       <p className="text-sm font-bold text-slate-900 tracking-tight">Agency Info</p>
                     </div>
-                    <FormField label="Agency Name" htmlFor="company_name" error={errors.company_name?.message}>
+                    <FormField label="Agency Name" htmlFor="company_name" error={errors.company_name?.message} required>
                       <Input id="company_name" placeholder="Independent or Agency Name"
                         leftIcon={<Building2 className="h-4 w-4 text-slate-400" />} {...register("company_name")} />
+                    </FormField>
+                    <FormField label="PAN Number" htmlFor="pan_number" error={errors.pan_number?.message} hint="Required for GST invoicing" required>
+                      <Input id="pan_number" placeholder="ABCDE1234F" maxLength={10} className="uppercase"
+                        leftIcon={<CreditCard className="h-4 w-4 text-slate-400" />}
+                        {...register("pan_number", { setValueAs: (v: string) => v?.toUpperCase() })} />
                     </FormField>
                   </div>
                 )}
@@ -302,8 +356,12 @@ export default function RegisterPage() {
                 {/* Passwords */}
                 <div className="grid grid-cols-2 gap-4">
                   <FormField label="Password" htmlFor="password" error={errors.password?.message} required>
-                    <Input id="password" type={showPassword ? "text" : "password"} autoComplete="new-password"
-                      placeholder="••••••••" error={!!errors.password}
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      placeholder="••••••••"
+                      error={!!errors.password}
                       leftIcon={<Lock className="h-4 w-4 text-slate-400" />}
                       rightIcon={
                         <button type="button" onClick={() => setShowPassword((s) => !s)}
@@ -311,7 +369,14 @@ export default function RegisterPage() {
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                       }
-                      {...register("password")} />
+                      {...passwordRegister}
+                      ref={passwordRef}
+                      onFocus={() => setIsPasswordFocused(true)}
+                      onBlur={(e) => {
+                        passwordOnBlur(e);
+                        setIsPasswordFocused(false);
+                      }}
+                    />
                   </FormField>
                   <FormField label="Confirm" htmlFor="confirmPassword" error={errors.confirmPassword?.message} required>
                     <Input id="confirmPassword" type={showPassword ? "text" : "password"} autoComplete="new-password"
@@ -319,6 +384,20 @@ export default function RegisterPage() {
                       leftIcon={<Lock className="h-4 w-4 text-slate-400" />} {...register("confirmPassword")} />
                   </FormField>
                 </div>
+
+                {isPasswordFocused && (
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <p className="text-xs font-semibold text-slate-500 mb-1">Password requirements:</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {passwordRules.map((rule, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-xs">
+                          <CheckCircle2 className={cn("h-4 w-4 shrink-0 transition-colors duration-200", rule.valid ? "text-green-500 fill-green-50" : "text-slate-300")} />
+                          <span className={rule.valid ? "text-green-700 font-medium" : "text-slate-500"}>{rule.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Terms */}
                 <FormField error={errors.terms?.message}>

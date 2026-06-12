@@ -11,46 +11,168 @@ import type {
 } from "@/lib/types/agent.types";
 import type { WalletSummary, WalletTransaction, TopupRequest } from "@/lib/types/wallet.types";
 
+function parseSummaryOrigin(s: string): string {
+  try {
+    if (!s) return "";
+    const part1 = s.split(",")[0] || "";
+    const part2 = part1.split("→")[0] || "";
+    return part2.trim().substring(0, 3).toUpperCase();
+  } catch {
+    return "";
+  }
+}
+
+function parseSummaryDestination(s: string): string {
+  try {
+    if (!s) return "";
+    const parts = s.split("→");
+    if (parts.length < 2) return "";
+    const part1 = parts[1] || "";
+    const part2 = part1.split(",")[0] || "";
+    return part2.trim().substring(0, 3).toUpperCase();
+  } catch {
+    return "";
+  }
+}
+
 export const customerApi = {
-  /* ── Dashboard ── */
-  getStats: () =>
-    apiClient.get<CustomerStats>("/customer/stats").then((r) => r.data),
+  /* --- Dashboard --- */
+  getStats: (): Promise<CustomerStats> =>
+    apiClient.get<any>("/dashboard/summary").then((r) => {
+      // backend: DashboardSummary
+      // backend: DashboardStats
+      const stats = r.data.stats;
+      return {
+        total_bookings: stats.total_bookings,
+        upcoming_trips: stats.upcoming_trips,
+        wallet_balance: stats.wallet_balance * 100, // rupees to paise
+        total_spent: 0, // backend: DashboardStats field does not exist, set to 0
+        completed_trips: 0, // backend: DashboardStats field does not exist, set to 0
+        cancelled_bookings: 0, // backend: DashboardStats field does not exist, set to 0
+      };
+    }),
 
-  getUpcomingTrips: () =>
-    apiClient.get<CustomerBooking[]>("/customer/bookings/upcoming").then((r) => r.data),
+  getUpcomingTrips: (): Promise<CustomerBooking[]> =>
+    apiClient.get<any>("/dashboard/summary").then((r) => {
+      // backend: DashboardSummary
+      // backend: BookingSummary
+      const bookings = r.data.upcoming_bookings || [];
+      return bookings.map((b: any) => ({
+        id: String(b.id),
+        booking_ref: b.booking_reference,
+        status: b.status,
+        travel_date: b.travel_date ? String(b.travel_date) : "",
+        // origin/destination are parsed heuristically from the summary string because the /dashboard/summary endpoint does not return structured IATA codes. If the parse fails the card still renders with empty origin/destination rather than crashing.
+        origin: parseSummaryOrigin(b.summary),
+        destination: parseSummaryDestination(b.summary),
+        total_amount: b.total_amount * 100, // rupees to paise
+        passenger_count: 1, // backend: BookingSummary passenger_count does not exist, default to 1
+        created_at: String(b.created_at),
+      }));
+    }),
 
-  /* ── Flight search (shared endpoint) ── */
-  searchFlights: (params: FlightSearchParams) =>
-    apiClient.post<FlightSearchResponse>("/flights/search", params).then((r) => r.data),
+  /* --- Flight search (shared endpoint) --- */
+  searchFlights: (params: FlightSearchParams): Promise<FlightSearchResponse> => {
+    const payload: any = {
+      origin: params.origin,
+      destination: params.destination,
+      depart_date: params.travel_date,
+      adults: params.adults,
+    };
+    if (params.return_date) payload.return_date = params.return_date;
+    if (params.children !== undefined) payload.children = params.children;
+    if (params.infants !== undefined) payload.infants = params.infants;
+    if (params.cabin_class) payload.travel_class = params.cabin_class;
 
-  /* ── Bookings ── */
-  getBookings: (params?: { page?: number; size?: number; status?: string; search?: string }) =>
-    apiClient
-      .get<CustomerBookingsResponse>("/customer/bookings", { params })
+    return apiClient
+      .post<FlightSearchResponse>("/search/flights", payload)
+      .then((r) => r.data);
+  },
+
+  /* --- Bookings --- */
+  getBookings: (params?: { page?: number; size?: number; status?: string; booking_type?: string }): Promise<CustomerBookingsResponse> => {
+    const queryParams: any = {};
+    if (params) {
+      if (params.page) queryParams.page = params.page;
+      if (params.size) queryParams.page_size = params.size;
+      if (params.status) queryParams.status = params.status;
+      if (params.booking_type) queryParams.booking_type = params.booking_type;
+    }
+    return apiClient
+      .get<any>("/dashboard/bookings", { params: queryParams })
       .then((r) => {
+        // backend: BookingListResponse
+        // backend: BookingSummary
         const raw = r.data;
-        return { results: raw.results ?? raw.items ?? [], total: raw.total };
-      }),
+        const mapped = (raw.items || []).map((b: any) => ({
+          id: String(b.id),
+          booking_ref: b.booking_reference,
+          status: b.status,
+          travel_date: b.travel_date ? String(b.travel_date) : "",
+          // origin/destination are parsed heuristically from the summary string because the /dashboard/summary endpoint does not return structured IATA codes. If the parse fails the card still renders with empty origin/destination rather than crashing.
+          origin: parseSummaryOrigin(b.summary),
+          destination: parseSummaryDestination(b.summary),
+          total_amount: b.total_amount * 100, // rupees to paise
+          passenger_count: 1, // backend: BookingSummary passenger_count does not exist, default to 1
+          created_at: String(b.created_at),
+        }));
+        return { results: mapped, total: raw.total ?? 0 };
+      });
+  },
 
-  getBookingById: (id: string) =>
-    apiClient.get<CustomerBooking>(`/customer/bookings/${id}`).then((r) => r.data),
+  getBookingById: (compositeId: string): Promise<CustomerBooking> => {
+    let booking_type = "flight";
+    let booking_id = compositeId;
+    if (compositeId.includes(":")) {
+      const parts = compositeId.split(":");
+      booking_type = parts[0];
+      booking_id = parts[1];
+    }
+    return apiClient
+      .get<any>(`/dashboard/bookings/${booking_type}/${booking_id}`)
+      .then((r) => {
+        // backend: BookingDetailResponse
+        const b = r.data;
+        return {
+          id: String(b.id),
+          booking_ref: b.booking_reference,
+          status: b.status,
+          travel_date: b.travel_date ? String(b.travel_date) : "",
+          origin: b.origin || parseSummaryOrigin(b.summary || ""),
+          destination: b.destination || parseSummaryDestination(b.summary || ""),
+          total_amount: b.total_amount * 100, // rupees to paise
+          passenger_count: b.passenger_count || 1,
+          created_at: String(b.created_at),
+        };
+      });
+  },
 
-  createBooking: (data: CreateBookingRequest) =>
+  createBooking: (data: CreateBookingRequest): Promise<CustomerBooking> =>
     apiClient.post<CustomerBooking>("/bookings", data).then((r) => r.data),
 
-  cancelBooking: (id: string, reason?: string) =>
-    apiClient.post(`/customer/bookings/${id}/cancel`, { reason }).then((r) => r.data),
+  cancelBooking: (id: string, reason?: string): Promise<any> =>
+    apiClient.put(`/bookings/${id}/cancel`, { reason }).then((r) => r.data),
 
-  downloadTicket: (id: string) =>
-    apiClient
-      .get<Blob>(`/customer/bookings/${id}/ticket`, { responseType: "blob" })
-      .then((r) => r.data),
+  downloadTicket: (compositeId: string): Promise<Blob> => {
+    let booking_type = "flight";
+    let booking_id = compositeId;
+    if (compositeId.includes(":")) {
+      const parts = compositeId.split(":");
+      booking_type = parts[0];
+      booking_id = parts[1];
+    }
+    return apiClient
+      .get<Blob>(`/dashboard/bookings/${booking_type}/${booking_id}/ticket`, {
+        responseType: "blob",
+      })
+      .then((r) => r.data);
+  },
 
-  /* ── Wallet ── */
-  getWallet: () =>
+  /* --- Wallet --- */
+  getWallet: (): Promise<WalletSummary> =>
     apiClient.get<WalletSummary>("/wallet/").then((r) => r.data),
 
-  getTransactions: (params?: { page?: number; size?: number }) =>
+  getTransactions: (params?: { page?: number; size?: number }): Promise<{ results: WalletTransaction[]; total: number }> =>
     apiClient
       .get<{ results?: WalletTransaction[]; items?: WalletTransaction[]; total?: number } | WalletTransaction[]>(
         "/wallet/transactions",
@@ -62,9 +184,9 @@ export const customerApi = {
         return { results: raw.results ?? raw.items ?? [], total: raw.total ?? 0 };
       }),
 
-  requestTopup: (data: { amount: number; payment_method: string; reference?: string; notes?: string }) =>
+  requestTopup: (data: { amount: number; payment_method: string; reference?: string; notes?: string }): Promise<any> =>
     apiClient.post("/wallet/topup/request", data).then((r) => r.data),
 
-  getTopupHistory: () =>
-    apiClient.get<TopupRequest[]>("/customer/wallet/topups").then((r) => r.data),
+  getTopupHistory: (): Promise<TopupRequest[]> =>
+    apiClient.get<TopupRequest[]>("/wallet/topup/history").then((r) => r.data),
 };

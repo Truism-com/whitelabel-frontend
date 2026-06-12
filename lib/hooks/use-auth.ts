@@ -64,25 +64,44 @@ export function useAuth() {
   );
 
   const register = useCallback(
-    async (data: RegisterRequest) => {
+    async (data: RegisterRequest, plainPassword?: string) => {
       setLoading(true);
       try {
         await authApi.register(data);
       } catch (err) {
         setLoading(false);
-        const message = parseApiError(err);
-        toast.error(message);
-        throw new Error(message);
+        throw err;
       }
 
       /* Auto-login after successful registration */
+      const loginPassword = plainPassword || data.password;
       try {
-        await login({ email: data.email, password: data.password });
+        const tokens = await authApi.login({ email: data.email, password: loginPassword });
+        if (typeof window !== "undefined") {
+          localStorage.setItem("access_token", tokens.access_token);
+          localStorage.setItem("refresh_token", tokens.refresh_token);
+        }
+        const user = await authApi.me();
+        setAuth(user, tokens);
+        setLoading(false);
+
+        const destination =
+          {
+            superadmin: "/superadmin/dashboard",
+            admin: "/admin/dashboard",
+            agent: "/agent/dashboard",
+            customer: "/my/dashboard",
+          }[user.role as UserRole] || "/";
+
+        router.push(destination);
+        toast.success(`Welcome back, ${user.name.split(" ")[0]}!`);
       } catch (err) {
-        throw err;
+        setLoading(false);
+        toast.success("Account created! Please sign in.");
+        router.push("/login");
       }
     },
-    [login, setLoading]
+    [router, setAuth, setLoading]
   );
 
   const logout = useCallback(async () => {

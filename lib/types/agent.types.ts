@@ -12,6 +12,7 @@ export interface FlightSearchParams {
   infants?:     number;
   cabin_class?: CabinClass;
   trip_type?:   TripType;
+  depart_date?: string;           // alias; set by the api layer before sending
 }
 
 export interface FlightSegment {
