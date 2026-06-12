@@ -104,7 +104,12 @@ function TopupDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
         setIsProcessing(false);
       }
     } else {
-      await requestTopup.mutateAsync({ ...v, amount: v.amount });
+      await requestTopup.mutateAsync({
+        amount: v.amount,
+        payment_method: v.payment_method,
+        reference: v.reference,
+        notes: v.notes,
+      });
       reset();
       onClose();
     }

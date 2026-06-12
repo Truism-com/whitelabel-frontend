@@ -52,7 +52,7 @@ function RuleForm({ defaultValues, onSubmit, onCancel, isPending }: {
   isPending: boolean;
 }) {
   const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as any,
     defaultValues: { markup_type: "percentage", applies_to: "all", is_active: true, value: 0, ...defaultValues },
   });
 
