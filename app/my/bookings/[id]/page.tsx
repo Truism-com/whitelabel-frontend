@@ -27,7 +27,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   const { data: booking, isLoading } = useCustomerBooking(id);
   const cancel = useCancelBooking();
   const [showCancel, setShowCancel] = useState(false);
-  const [reason, setReason]         = useState("");
+  const [reason, setReason] = useState("");
   const [downloading, setDownloading] = useState(false);
 
   const handleDownload = async () => {
@@ -35,9 +35,9 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
     setDownloading(true);
     try {
       const blob = await customerApi.downloadTicket(id);
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement("a");
-      a.href     = url;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
       a.download = `ticket-${booking.pnr ?? booking.booking_ref}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
@@ -67,7 +67,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   }
 
   const canCancel = booking.status === "confirmed" || booking.status === "pending" || booking.status === "processing";
-  const seg      = booking.segments?.[0];
+  const seg = booking.segments?.[0];
 
   return (
     <div className="max-w-3xl mx-auto space-y-5">
@@ -201,7 +201,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                   <p className="font-semibold text-slate-800 text-sm">
                     {p.title} {p.first_name} {p.last_name}
                   </p>
-                  {p.passport_no && <p className="text-xs text-slate-400 font-mono">Passport: {p.passport_no}</p>}
+                  {p.passport_number && <p className="text-xs text-slate-400 font-mono">Passport: {p.passport_number}</p>}
                 </div>
               </div>
             ))}
