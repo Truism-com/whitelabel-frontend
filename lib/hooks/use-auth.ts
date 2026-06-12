@@ -68,17 +68,21 @@ export function useAuth() {
       setLoading(true);
       try {
         await authApi.register(data);
-        setLoading(false);
-        toast.success("Account created! Please log in.");
-        router.push("/login");
       } catch (err) {
         setLoading(false);
         const message = parseApiError(err);
         toast.error(message);
         throw new Error(message);
       }
+
+      /* Auto-login after successful registration */
+      try {
+        await login({ email: data.email, password: data.password });
+      } catch (err) {
+        throw err;
+      }
     },
-    [router, setLoading]
+    [login, setLoading]
   );
 
   const logout = useCallback(async () => {
