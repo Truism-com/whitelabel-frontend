@@ -81,7 +81,6 @@ export function Header({ onMenuClick }: HeaderProps) {
       <div className="flex items-center gap-1.5">
         <button className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors relative" aria-label="Notifications">
           <Bell className="h-4 w-4" />
-          <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-red-500" />
         </button>
 
         <div className="h-7 w-px bg-slate-200 mx-1" />

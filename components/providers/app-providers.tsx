@@ -21,27 +21,27 @@ export function AppProviders({ children, tenantConfig }: AppProvidersProps) {
   }, []);
 
   useEffect(() => {
-    const shownThisSession = sessionStorage.getItem("cold-start-overlay-shown") === "true";
-    if (shownThisSession) {
-      return;
-    }
-
+    let pendingCount = 0;
     let timer: NodeJS.Timeout | null = null;
 
     const unsubscribe = clientEvents.subscribe((event) => {
       if (event === "request-start") {
-        if (!timer) {
+        pendingCount++;
+        if (pendingCount === 1) {
+          if (timer) clearTimeout(timer);
           timer = setTimeout(() => {
             setShowOverlay(true);
-            sessionStorage.setItem("cold-start-overlay-shown", "true");
           }, 3000);
         }
       } else if (event === "response-received") {
-        if (timer) {
-          clearTimeout(timer);
-          timer = null;
+        pendingCount = Math.max(0, pendingCount - 1);
+        if (pendingCount === 0) {
+          if (timer) {
+            clearTimeout(timer);
+            timer = null;
+          }
+          setShowOverlay(false);
         }
-        setShowOverlay(false);
       }
     });
 

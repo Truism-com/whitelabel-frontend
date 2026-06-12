@@ -72,9 +72,8 @@ export function CustomerNavbar() {
 
           {/* Right: notifications + profile */}
           <div className="hidden md:flex items-center gap-2 ml-auto">
-            <button className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors relative">
+            <button className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors relative" aria-label="Notifications">
               <Bell className="h-4.5 w-4.5" />
-              <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-red-500" />
             </button>
 
             {/* Profile dropdown */}

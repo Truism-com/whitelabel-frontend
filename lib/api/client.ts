@@ -70,12 +70,8 @@ export const apiClient: AxiosInstance = axios.create({
 /* --- Request interceptor - attach JWT + tenant header ----------- */
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    if (!coldStartDone) {
-      config.timeout = 90000;
-      clientEvents.emit("request-start");
-    } else {
-      config.timeout = 30000;
-    }
+    config.timeout = coldStartDone ? 30000 : 90000;
+    clientEvents.emit("request-start");
 
     const token = storage.getAccess();
     if (token) config.headers.Authorization = `Bearer ${token}`;
@@ -97,14 +93,12 @@ apiClient.interceptors.response.use(
   (res) => {
     if (!coldStartDone) {
       coldStartDone = true;
-      clientEvents.emit("response-received");
     }
+    clientEvents.emit("response-received");
     return res;
   },
   async (error: AxiosError) => {
-    if (!coldStartDone) {
-      clientEvents.emit("response-received");
-    }
+    clientEvents.emit("response-received");
 
     const original = error.config as InternalAxiosRequestConfig & {
       _retry?: boolean;
@@ -143,7 +137,11 @@ apiClient.interceptors.response.use(
     } catch (refreshError) {
       drainQueue(refreshError, null);
       storage.clear();
-      if (typeof window !== "undefined") window.location.href = "/login";
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("auth");
+        const nextPath = window.location.pathname + window.location.search;
+        window.location.href = `/login?expired=true&next=${encodeURIComponent(nextPath)}`;
+      }
       return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;

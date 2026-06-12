@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { toast } from "sonner";
 import {
   Eye,
   EyeOff,
@@ -136,11 +138,38 @@ function AuthPanel() {
   );
 }
 
-/* ─── Login form ─────────────────────────────────────────────────── */
+/* ─── Login form wrapper ─────────────────────────────────────────── */
 export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-1 flex-col items-center justify-center min-h-[60vh] bg-white">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const { login, isLoading } = useAuth();
+  const searchParams = useSearchParams();
+
+  const isExpired = searchParams.get("expired") === "true";
+  const redirectTo = searchParams.get("next") || undefined;
+
+  useEffect(() => {
+    if (isExpired) {
+      const t = setTimeout(() => {
+        toast.error("Session expired, please sign in", {
+          id: "session-expired",
+        });
+      }, 100);
+      return () => clearTimeout(t);
+    }
+  }, [isExpired]);
 
   const {
     register,
@@ -151,7 +180,7 @@ export default function LoginPage() {
   async function onSubmit(values: FormValues) {
     setApiError(null);
     try {
-      await login(values);
+      await login(values, redirectTo);
     } catch (err) {
       setApiError((err as Error).message);
     }
