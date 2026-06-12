@@ -19,7 +19,7 @@ import { useAuth }    from "@/lib/hooks/use-auth";
 import { AuthPanel }  from "@/components/auth/auth-panel";
 
 /* ─── Types ──────────────────────────────────────────────────────── */
-type AccountType = "customer" | "agent" | "admin";
+type AccountType = "customer" | "agent";
 
 /* ─── Schema ─────────────────────────────────────────────────────── */
 const schema = z.object({
@@ -29,7 +29,7 @@ const schema = z.object({
   address:         z.string().optional(),
   password:        z.string().min(8, "Min 8 chars").regex(/[A-Z]/, "Need uppercase").regex(/[0-9]/, "Need number"),
   confirmPassword: z.string().min(1, "Confirm password"),
-  role:            z.enum(["customer", "agent", "admin"]),
+  role:            z.enum(["customer", "agent"]),
   company_name:    z.string().optional(),
   pan_number:      z.string().optional(),
   terms:           z.literal(true, { message: "You must accept the terms" }),
@@ -39,11 +39,29 @@ const schema = z.object({
     path: ["confirmPassword"],
   })
   .refine(
+    (d) => {
+      if (d.role === "agent") {
+        return !!d.company_name?.trim();
+      }
+      return true;
+    },
+    { message: "Company name is required for agents", path: ["company_name"] }
+  )
+  .refine(
+    (d) => {
+      if (d.role === "agent") {
+        return !!d.pan_number?.trim();
+      }
+      return true;
+    },
+    { message: "PAN number is required for agents", path: ["pan_number"] }
+  )
+  .refine(
     (d) =>
       !d.pan_number ||
       d.pan_number.trim() === "" ||
-      /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(d.pan_number),
-    { message: "Enter a valid PAN", path: ["pan_number"] }
+      /^[a-zA-Z0-9]{10}$/.test(d.pan_number.trim()),
+    { message: "PAN number must be exactly 10 alphanumeric characters", path: ["pan_number"] }
   );
 
 type FormValues = z.infer<typeof schema>;
@@ -105,7 +123,7 @@ export default function RegisterPage() {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { role: "admin" }, // Defaulting to admin to guide B2B users
+    defaultValues: { role: "agent" }, // Defaulting to agent to guide B2B users
   });
 
   const selectedRole = watch("role") as AccountType;
@@ -190,13 +208,6 @@ export default function RegisterPage() {
 
               <div className="space-y-4 mb-8">
                 <RoleCard
-                  icon={Building2}
-                  title="Register a Business"
-                  description="I want to launch a white-label booking website and manage an agency."
-                  selected={selectedRole === "admin"}
-                  onSelect={() => setValue("role", "admin")}
-                />
-                <RoleCard
                   icon={Users}
                   title="Join as an Agent"
                   description="I want to book flights for my clients and earn commissions."
@@ -240,7 +251,6 @@ export default function RegisterPage() {
 
               <div className="mb-8">
                 <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">
-                  {selectedRole === "admin" && "Setup your Business"}
                   {selectedRole === "agent" && "Create Agent Profile"}
                   {selectedRole === "customer" && "Create Personal Account"}
                 </h1>
@@ -266,25 +276,6 @@ export default function RegisterPage() {
                     error={!!errors.email} leftIcon={<Mail className="h-4 w-4 text-slate-400" />} {...register("email")} />
                 </FormField>
 
-                {/* Conditional Fields: Admin */}
-                {selectedRole === "admin" && (
-                  <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 space-y-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <ShieldCheck className="h-4 w-4 text-blue-600" />
-                      <p className="text-sm font-bold text-slate-900 tracking-tight">Business Info</p>
-                    </div>
-                    <FormField label="Company Name" htmlFor="company_name" error={errors.company_name?.message}>
-                      <Input id="company_name" placeholder="TravelEase Pvt. Ltd."
-                        leftIcon={<Building2 className="h-4 w-4 text-slate-400" />} {...register("company_name")} />
-                    </FormField>
-                    <FormField label="PAN Number" htmlFor="pan_number" error={errors.pan_number?.message} hint="Required for GST invoicing">
-                      <Input id="pan_number" placeholder="ABCDE1234F" maxLength={10} className="uppercase"
-                        leftIcon={<CreditCard className="h-4 w-4 text-slate-400" />}
-                        {...register("pan_number", { setValueAs: (v: string) => v?.toUpperCase() })} />
-                    </FormField>
-                  </div>
-                )}
-
                 {/* Conditional Fields: Agent */}
                 {selectedRole === "agent" && (
                   <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 space-y-4">
@@ -292,9 +283,14 @@ export default function RegisterPage() {
                       <Users className="h-4 w-4 text-blue-600" />
                       <p className="text-sm font-bold text-slate-900 tracking-tight">Agency Info</p>
                     </div>
-                    <FormField label="Agency Name" htmlFor="company_name" error={errors.company_name?.message}>
+                    <FormField label="Agency Name" htmlFor="company_name" error={errors.company_name?.message} required>
                       <Input id="company_name" placeholder="Independent or Agency Name"
                         leftIcon={<Building2 className="h-4 w-4 text-slate-400" />} {...register("company_name")} />
+                    </FormField>
+                    <FormField label="PAN Number" htmlFor="pan_number" error={errors.pan_number?.message} required hint="Exactly 10 alphanumeric characters">
+                      <Input id="pan_number" placeholder="ABCDE1234F" maxLength={10} className="uppercase"
+                        leftIcon={<CreditCard className="h-4 w-4 text-slate-400" />}
+                        {...register("pan_number", { setValueAs: (v: string) => v?.toUpperCase() })} />
                     </FormField>
                   </div>
                 )}
