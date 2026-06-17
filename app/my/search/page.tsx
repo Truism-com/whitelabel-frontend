@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -198,6 +199,7 @@ function FlightCard({ result, selected, onSelect }: {
 
 /* ─── Main page ───────────────────────────────────────────────────── */
 export default function SearchPage() {
+  const router = useRouter();
   const [results, setResults]         = useState<FlightSearchResponse | null>(null);
   const [selected, setSelected]       = useState<FlightResult | null>(null);
   const [sort, setSort]               = useState<SortKey>("price");
@@ -243,7 +245,7 @@ export default function SearchPage() {
   const confirmBooking = async () => {
     if (!selected || !results) return;
     const v = getValues();
-    await createBooking.mutateAsync({
+    const res = await createBooking.mutateAsync({
       search_id:     results.search_id,
       offer_id:      selected.offer_id,
       passengers:    v.passengers.map(p => ({
@@ -264,6 +266,10 @@ export default function SearchPage() {
     setConfirmOpen(false);
     setResults(null);
     setSelected(null);
+    const bookingId = (res as any).booking_id ?? (res as any).id;
+    if (bookingId) {
+      router.push(`/my/bookings/confirm/${bookingId}`);
+    }
   };
 
   const totalFare = selected ? selected.price * fields.length : 0;

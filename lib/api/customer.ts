@@ -86,7 +86,17 @@ export const customerApi = {
 
     return apiClient
       .post<FlightSearchResponse>("/search/flights", payload)
-      .then((r) => r.data);
+      .then((r) => {
+        const data = r.data;
+        return {
+          ...data,
+          results: (data.results || []).map((f: any) => ({
+            ...f,
+            duration: `${Math.floor(f.duration_minutes / 60)}h ${f.duration_minutes % 60}m`,
+            refundable: f.is_refundable,
+          })),
+        };
+      });
   },
 
   /* --- Bookings --- */
@@ -205,4 +215,7 @@ export const customerApi = {
 
   getTopupHistory: (): Promise<TopupRequest[]> =>
     apiClient.get<any>("/wallet/topup/history").then((r) => r.data.requests || []),
+
+  getBookingStatus: (bookingId: string | number): Promise<any> =>
+    apiClient.get(`/bookings/flights/${bookingId}/status`).then((r) => r.data),
 };

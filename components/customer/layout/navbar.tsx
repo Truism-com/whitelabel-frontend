@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   Plane, Search, CalendarCheck, Wallet, User,
-  LogOut, Menu, X, ChevronDown, Bell,
+  LogOut, Menu, X, ChevronDown, Bell, Hotel, Bus,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/lib/hooks/use-auth";
@@ -13,6 +13,8 @@ import { useCustomerWallet } from "@/lib/hooks/use-customer";
 
 const NAV_LINKS = [
   { label: "Search Flights", href: "/my/search",   icon: Search },
+  { label: "Hotels",         href: "/my/hotels",   icon: Hotel },
+  { label: "Buses",          href: "/my/buses",    icon: Bus },
   { label: "My Bookings",    href: "/my/bookings",  icon: CalendarCheck },
   { label: "Wallet",         href: "/my/wallet",    icon: Wallet },
 ];

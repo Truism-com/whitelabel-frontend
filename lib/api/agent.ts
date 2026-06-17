@@ -88,7 +88,17 @@ export const agentApi = {
 
     return apiClient
       .post<FlightSearchResponse>("/search/flights", payload)
-      .then((r) => r.data);
+      .then((r) => {
+        const data = r.data;
+        return {
+          ...data,
+          results: (data.results || []).map((f: any) => ({
+            ...f,
+            duration: `${Math.floor(f.duration_minutes / 60)}h ${f.duration_minutes % 60}m`,
+            refundable: f.is_refundable,
+          })),
+        };
+      });
   },
 
   /* --- Bookings --- */
@@ -171,4 +181,7 @@ export const agentApi = {
 
   requestTopup: (data: TopupRequestPayload): Promise<any> =>
     apiClient.post("/wallet/topup/request", data).then((r) => r.data),
+
+  getBookingStatus: (bookingId: string | number): Promise<any> =>
+    apiClient.get(`/bookings/flights/${bookingId}/status`).then((r) => r.data),
 };

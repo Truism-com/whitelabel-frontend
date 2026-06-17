@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, PlaneTakeoff, CalendarCheck,
-  Wallet, User, LogOut, Plane, History,
+  Wallet, User, LogOut, Plane, History, Hotel, Bus,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/lib/hooks/use-auth";
@@ -29,6 +29,13 @@ const NAV: { section: string; items: NavItem[] }[] = [
     items: [
       { label: "Search & Book",  href: "/agent/bookings/new",  icon: PlaneTakeoff },
       { label: "My Bookings",    href: "/agent/bookings",       icon: CalendarCheck },
+    ],
+  },
+  {
+    section: "Hotels & Buses",
+    items: [
+      { label: "Hotels",         href: "/agent/hotels",         icon: Hotel, badge: "Soon" },
+      { label: "Buses",          href: "/agent/buses",          icon: Bus, badge: "Soon" },
     ],
   },
   {

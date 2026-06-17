@@ -64,7 +64,7 @@ export function AppProviders({ children, tenantConfig }: AppProvidersProps) {
                 <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
               <h3 className="font-semibold text-lg text-slate-900 dark:text-white">
-                Waking up the demo server, this takes about 30 seconds on first load.
+                Waking up the server, this takes about 30 seconds on first load.
               </h3>
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 The backend is hosted on a free dyno which goes to sleep after inactivity. Thank you for your patience!

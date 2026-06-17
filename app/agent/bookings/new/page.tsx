@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -201,6 +202,7 @@ function PassengerRow({ index, register, errors, remove, canRemove }: {
 
 /* ─── Main page ──────────────────────────────────────────────────── */
 export default function NewBookingPage() {
+  const router = useRouter();
   const [searchResults, setSearchResults] = useState<FlightSearchResponse | null>(null);
   const [selectedFlight, setSelectedFlight] = useState<FlightResult | null>(null);
   const [bookingStep, setBookingStep] = useState<"search" | "select" | "details" | "confirm">("search");
@@ -244,7 +246,7 @@ export default function NewBookingPage() {
   const confirmBooking = async () => {
     if (!selectedFlight || !searchResults) return;
     const vals = getValues();
-    await createBooking.mutateAsync({
+    const res = await createBooking.mutateAsync({
       search_id:     searchResults.search_id,
       offer_id:      selectedFlight.offer_id,
       passengers:    vals.passengers.map(p => ({
@@ -267,6 +269,10 @@ export default function NewBookingPage() {
     setBookingStep("search");
     setSearchResults(null);
     setSelectedFlight(null);
+    const bookingId = (res as any).booking_id ?? (res as any).id;
+    if (bookingId) {
+      router.push(`/agent/bookings/confirm/${bookingId}`);
+    }
   };
 
   const totalFare = selectedFlight

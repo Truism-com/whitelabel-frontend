@@ -111,3 +111,24 @@ export function useRequestTopup() {
     onError: (e) => toast.error(parseApiError(e)),
   });
 }
+
+export function useBookingStatus(bookingId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["customer", "bookings", bookingId, "status"],
+    queryFn: () => customerApi.getBookingStatus(bookingId),
+    enabled: !!bookingId && enabled,
+    refetchInterval: (query) => {
+      const state = query.state.data as any;
+      if (
+        state &&
+        (state.status === "confirmed" ||
+          state.status === "cancelled" ||
+          state.status === "failed" ||
+          state.status === "ticketing_failed")
+      ) {
+        return false;
+      }
+      return 2000;
+    },
+  });
+}
