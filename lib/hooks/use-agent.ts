@@ -99,7 +99,7 @@ export function useBookingStatus(bookingId: string, enabled: boolean) {
     queryKey: ["agent", "bookings", bookingId, "status"],
     queryFn: () => agentApi.getBookingStatus(bookingId),
     enabled: !!bookingId && enabled,
-    refetchInterval: (query) => {
+    refetchInterval: (query: any) => {
       const state = query.state.data as any;
       if (
         state &&

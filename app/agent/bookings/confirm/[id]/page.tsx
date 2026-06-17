@@ -151,7 +151,6 @@ export default function AgentConfirmPage({ params }: { params: Promise<{ id: str
               <div className="flex items-center justify-between gap-4 py-2">
                 <div className="text-left">
                   <p className="text-2xl font-bold text-slate-950">{booking.origin}</p>
-                  <p className="text-xs text-slate-400 max-w-[120px] truncate">{booking.origin_name}</p>
                 </div>
                 <div className="flex-1 flex flex-col items-center gap-1">
                   <div className="w-full flex items-center gap-1">
@@ -165,7 +164,6 @@ export default function AgentConfirmPage({ params }: { params: Promise<{ id: str
                 </div>
                 <div className="text-right">
                   <p className="text-2xl font-bold text-slate-950">{booking.destination}</p>
-                  <p className="text-xs text-slate-400 max-w-[120px] truncate">{booking.destination_name}</p>
                 </div>
               </div>
             </div>
