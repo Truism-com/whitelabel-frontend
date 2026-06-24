@@ -49,7 +49,7 @@ export default function AgentConfirmPage({ params }: { params: Promise<{ id: str
   const ref = statusData?.booking_reference || booking?.booking_ref;
 
   // Render Loading / Pending state
-  if (statusLoading || (status === "pending" || status === "processing")) {
+  if (statusLoading || status === "pending") {
     return (
       <div className="max-w-md mx-auto py-16 text-center space-y-6">
         <div className="relative flex justify-center items-center">
@@ -81,7 +81,7 @@ export default function AgentConfirmPage({ params }: { params: Promise<{ id: str
   }
 
   // Render Failure state
-  if (status === "failed" || status === "ticketing_failed") {
+  if (status === "ticketing_failed" || status === "expired") {
     return (
       <div className="max-w-md mx-auto py-16 text-center space-y-6">
         <div className="relative flex justify-center items-center">

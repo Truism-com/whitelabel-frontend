@@ -66,7 +66,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
     );
   }
 
-  const canCancel = booking.status === "confirmed" || booking.status === "pending" || booking.status === "processing";
+  const canCancel = booking.status === "confirmed" || booking.status === "pending";
   const seg = booking.segments?.[0];
 
   return (

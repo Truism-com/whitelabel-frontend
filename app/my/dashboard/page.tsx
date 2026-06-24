@@ -51,7 +51,7 @@ function UpcomingCard({ trip }: { trip: CustomerBooking }) {
       <div className={cn(
         "px-5 py-3 flex items-center justify-between",
         trip.status === "confirmed" ? "bg-emerald-50" :
-        trip.status === "pending" || trip.status === "processing" ? "bg-amber-50" : "bg-slate-50"
+        trip.status === "pending" ? "bg-amber-50" : "bg-slate-50"
       )}>
         <div className="flex items-center gap-2">
           <PlaneTakeoff className={cn("h-4 w-4", trip.status === "confirmed" ? "text-emerald-600" : "text-amber-600")} />

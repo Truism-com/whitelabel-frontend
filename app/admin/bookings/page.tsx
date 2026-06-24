@@ -14,14 +14,17 @@ const STATUS_OPTS = [
   { value: "confirmed",  label: "Confirmed" },
   { value: "pending",    label: "Pending" },
   { value: "cancelled",  label: "Cancelled" },
-  { value: "processing", label: "Processing" },
+  { value: "ticketing_failed", label: "Ticketing Failed" },
+  { value: "expired", label: "Expired" },
 ];
 
 const STATUS_MAP: Record<string, { label: string; variant: "default" | "success" | "destructive" | "warning" | "secondary" }> = {
-  confirmed:  { label: "Confirmed",  variant: "success" },
-  pending:    { label: "Pending",    variant: "warning" },
-  cancelled:  { label: "Cancelled", variant: "destructive" },
-  processing: { label: "Processing", variant: "secondary" },
+  confirmed:        { label: "Confirmed",        variant: "success" },
+  pending:          { label: "Pending",          variant: "warning" },
+  cancelled:        { label: "Cancelled",        variant: "destructive" },
+  ticketing_failed: { label: "Ticketing Failed", variant: "destructive" },
+  expired:          { label: "Expired",          variant: "secondary" },
+  refunded:         { label: "Refunded",         variant: "secondary" },
 };
 
 export default function BookingsPage() {

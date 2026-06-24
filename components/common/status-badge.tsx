@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils/cn";
 import { Clock, CheckCircle2, XCircle, ArrowUpRight } from "lucide-react";
 
-export type BadgeStatus = "pending" | "confirmed" | "processing" | "cancelled" | "refunded" | "failed";
+export type BadgeStatus = "pending" | "confirmed" | "ticketing_failed" | "cancelled" | "refunded" | "expired";
 
 const STATUS_CFG: Record<BadgeStatus, {
   label: string;
@@ -12,12 +12,12 @@ const STATUS_CFG: Record<BadgeStatus, {
   icon: React.ElementType;
   pulse?: boolean;
 }> = {
-  confirmed:  { label: "Confirmed",  bg: "bg-emerald-50/70",   text: "text-emerald-700",   border: "border-emerald-200/60",   dot: "bg-emerald-500",  icon: CheckCircle2 },
-  pending:    { label: "Pending",    bg: "bg-amber-50/70",     text: "text-amber-700",     border: "border-amber-200/60",     dot: "bg-amber-500",    icon: Clock,        pulse: true },
-  processing: { label: "Processing", bg: "bg-amber-50/70",     text: "text-amber-700",     border: "border-amber-200/60",     dot: "bg-amber-500",    icon: Clock,        pulse: true },
-  cancelled:  { label: "Cancelled",  bg: "bg-rose-50/70",      text: "text-rose-700",      border: "border-rose-200/60",      dot: "bg-rose-500",     icon: XCircle },
-  refunded:   { label: "Refunded",   bg: "bg-slate-50/70",     text: "text-slate-700",     border: "border-slate-200/60",      dot: "bg-slate-500",    icon: ArrowUpRight },
-  failed:     { label: "Failed",     bg: "bg-rose-50/70",      text: "text-rose-700",      border: "border-rose-200/60",      dot: "bg-rose-500",     icon: XCircle },
+  confirmed:        { label: "Confirmed",        bg: "bg-emerald-50/70",  text: "text-emerald-700",  border: "border-emerald-200/60",  dot: "bg-emerald-500",  icon: CheckCircle2 },
+  pending:          { label: "Pending",          bg: "bg-amber-50/70",    text: "text-amber-700",    border: "border-amber-200/60",    dot: "bg-amber-500",    icon: Clock,        pulse: true },
+  ticketing_failed: { label: "Ticketing Failed", bg: "bg-rose-50/70",     text: "text-rose-700",     border: "border-rose-200/60",     dot: "bg-rose-500",     icon: XCircle },
+  cancelled:        { label: "Cancelled",        bg: "bg-rose-50/70",     text: "text-rose-700",     border: "border-rose-200/60",     dot: "bg-rose-500",     icon: XCircle },
+  refunded:         { label: "Refunded",         bg: "bg-slate-50/70",    text: "text-slate-700",    border: "border-slate-200/60",    dot: "bg-slate-500",    icon: ArrowUpRight },
+  expired:          { label: "Expired",          bg: "bg-slate-50/70",    text: "text-slate-700",    border: "border-slate-200/60",    dot: "bg-slate-500",    icon: XCircle },
 };
 
 interface StatusBadgeProps {

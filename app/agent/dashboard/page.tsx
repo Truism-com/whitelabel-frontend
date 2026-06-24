@@ -15,12 +15,12 @@ import { cn } from "@/lib/utils/cn";
 import type { BookingStatus } from "@/lib/types/agent.types";
 
 const STATUS_CONFIG: Record<BookingStatus, { label: string; variant: "success" | "warning" | "destructive" | "secondary"; icon: React.ElementType }> = {
-  confirmed:  { label: "Confirmed",  variant: "success",     icon: CheckCircle2 },
-  pending:    { label: "Pending",    variant: "warning",     icon: Clock },
-  processing: { label: "Processing", variant: "warning",     icon: Clock },
-  cancelled:  { label: "Cancelled",  variant: "destructive", icon: XCircle },
-  refunded:   { label: "Refunded",   variant: "secondary",   icon: ArrowUpRight },
-  failed:     { label: "Failed",     variant: "destructive", icon: XCircle },
+  confirmed:        { label: "Confirmed",        variant: "success",     icon: CheckCircle2 },
+  pending:          { label: "Pending",          variant: "warning",     icon: Clock },
+  ticketing_failed: { label: "Ticketing Failed", variant: "destructive", icon: XCircle },
+  cancelled:        { label: "Cancelled",        variant: "destructive", icon: XCircle },
+  refunded:         { label: "Refunded",         variant: "secondary",   icon: ArrowUpRight },
+  expired:          { label: "Expired",          variant: "secondary",   icon: XCircle },
 };
 
 function StatCard({

@@ -105,8 +105,8 @@ export function useBookingStatus(bookingId: string, enabled: boolean) {
         state &&
         (state.status === "confirmed" ||
           state.status === "cancelled" ||
-          state.status === "failed" ||
-          state.status === "ticketing_failed")
+          state.status === "ticketing_failed" ||
+          state.status === "expired")
       ) {
         return false;
       }

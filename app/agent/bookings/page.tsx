@@ -148,9 +148,10 @@ export default function AgentBookingsPage() {
             { value: "",           label: "All Status" },
             { value: "confirmed",  label: "Confirmed" },
             { value: "pending",    label: "Pending" },
-            { value: "processing", label: "Processing" },
+            { value: "ticketing_failed", label: "Ticketing Failed" },
             { value: "cancelled",  label: "Cancelled" },
             { value: "refunded",   label: "Refunded" },
+            { value: "expired",    label: "Expired" },
           ]}
           className="w-full sm:w-40"
         />
@@ -190,7 +191,7 @@ export default function AgentBookingsPage() {
                   </tr>
                 ) : (
                   bookings.map((b) => {
-                    const canCancel = b.status === "confirmed" || b.status === "pending" || b.status === "processing";
+                    const canCancel = b.status === "confirmed" || b.status === "pending";
                     return (
                       <tr key={b.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
                         <td className="py-3 px-4 first:pl-5">

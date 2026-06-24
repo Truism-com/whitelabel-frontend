@@ -45,7 +45,7 @@ export interface AdminUser {
   created_at: string;
 }
 
-export type BookingStatus = "confirmed" | "pending" | "cancelled" | "refunded" | "processing";
+export type BookingStatus = "confirmed" | "pending" | "cancelled" | "refunded" | "ticketing_failed" | "expired";
 export type BookingType   = "flight" | "hotel" | "bus";
 
 export interface AdminBooking {

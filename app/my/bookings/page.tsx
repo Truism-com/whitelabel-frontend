@@ -56,7 +56,7 @@ function CancelDialog({ booking, open, onClose }: { booking: CustomerBooking | n
 
 function BookingCard({ booking }: { booking: CustomerBooking }) {
   const [downloading, setDownloading] = useState(false);
-  const canCancel = booking.status === "confirmed" || booking.status === "pending" || booking.status === "processing";
+  const canCancel = booking.status === "confirmed" || booking.status === "pending";
   const [showCancel, setShowCancel] = useState(false);
 
   const handleDownload = async () => {
