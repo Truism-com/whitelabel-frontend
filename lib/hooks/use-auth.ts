@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import axios from "axios";
 import { useAuthStore } from "@/lib/stores/auth.store";
 import { authApi } from "@/lib/api/auth";
 import { parseApiError } from "@/lib/api/client";
@@ -70,6 +71,11 @@ export function useAuth() {
         await authApi.register(data);
       } catch (err) {
         setLoading(false);
+        if (axios.isAxiosError(err) && err.code === "ECONNABORTED") {
+          const timeoutErr = new Error("REGISTRATION_TIMEOUT") as Error & { isTimeout: boolean };
+          timeoutErr.isTimeout = true;
+          throw timeoutErr;
+        }
         throw err;
       }
 

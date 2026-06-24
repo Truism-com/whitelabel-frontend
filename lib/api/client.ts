@@ -41,7 +41,6 @@ function drainQueue(err: unknown, token: string | null) {
   queue = [];
 }
 
-let coldStartDone = false;
 
 // Custom Event Emitter to track request states for the cold start overlay
 type ClientEvent = "request-start" | "response-received";
@@ -63,14 +62,13 @@ export const clientEvents = {
 /* --- Axios instance ---------------------------------------------- */
 export const apiClient: AxiosInstance = axios.create({
   baseURL: "",
-  timeout: 30_000,
+  timeout: 90_000,
   headers: { "Content-Type": "application/json" },
 });
 
 /* --- Request interceptor - attach JWT + tenant header ----------- */
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    config.timeout = coldStartDone ? 30000 : 90000;
     clientEvents.emit("request-start");
 
     const token = storage.getAccess();
@@ -91,9 +89,6 @@ apiClient.interceptors.request.use(
 /* --- Response interceptor - silent token refresh on 401 ---------- */
 apiClient.interceptors.response.use(
   (res) => {
-    if (!coldStartDone) {
-      coldStartDone = true;
-    }
     clientEvents.emit("response-received");
     return res;
   },

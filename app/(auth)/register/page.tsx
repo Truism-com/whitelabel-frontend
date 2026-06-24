@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,7 +10,7 @@ import axios from "axios";
 import {
   Eye, EyeOff, Mail, Lock, User, Phone,
   Building2, CreditCard, Plane, ArrowRight, ArrowLeft,
-  Users, Star, CheckCircle2, MapPin, ShieldCheck
+  Users, Star, CheckCircle2, AlertTriangle
 } from "lucide-react";
 import { Button }     from "@/components/ui/button";
 import { Input }      from "@/components/ui/input";
@@ -111,9 +112,11 @@ function RoleCard({
 
 /* ─── Main register page ─────────────────────────────────────────── */
 export default function RegisterPage() {
+  const router = useRouter();
   const [step, setStep]                 = useState<1 | 2>(1);
   const [showPassword, setShowPassword] = useState(false);
   const [apiError, setApiError]         = useState<string | null>(null);
+  const [isTimeout, setIsTimeout]       = useState(false);
   const [selectedCard, setSelectedCard] = useState<AccountType>("customer");
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   
@@ -150,6 +153,7 @@ export default function RegisterPage() {
 
   async function onSubmit(values: FormValues) {
     setApiError(null);
+    setIsTimeout(false);
     try {
       const { confirmPassword: _cp, terms: _t, ...payload } = values;
       if (!payload.pan_number?.trim()) delete payload.pan_number;
@@ -160,6 +164,10 @@ export default function RegisterPage() {
       }
       await doRegister(payload as any, values.password);
     } catch (err) {
+      if ((err as any).isTimeout) {
+        setIsTimeout(true);
+        return;
+      }
       if (axios.isAxiosError(err) && err.response?.status === 422) {
         const detail = err.response.data?.detail;
         if (Array.isArray(detail)) {
@@ -234,6 +242,39 @@ export default function RegisterPage() {
             <span className="font-bold text-xl text-slate-900 tracking-tight">TravelOS</span>
           </div>
 
+          {/* Timeout banner - shown regardless of step */}
+          {isTimeout && (
+            <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-900">Server took too long to respond</p>
+                  <p className="text-xs text-amber-700 mt-1">
+                    Your account may have been created. Try signing in first - if that fails, submit this form again.
+                  </p>
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      type="button"
+                      onClick={() => router.push("/login")}
+                      className="text-xs font-semibold text-amber-900 underline underline-offset-2 hover:text-amber-700"
+                    >
+                      Try Sign In
+                    </button>
+                    <span className="text-amber-400 text-xs">or</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsTimeout(false)}
+                      className="text-xs font-semibold text-amber-900 underline underline-offset-2 hover:text-amber-700"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* API error banner - shown regardless of step */}
           {apiError && <Alert variant="destructive" className="mb-6">{apiError}</Alert>}
 
           {/* ================= STEP 1: ROLE SELECTION ================= */}
@@ -250,7 +291,7 @@ export default function RegisterPage() {
                   title="Register a Business"
                   description="I want to launch a white-label booking website and manage an agency."
                   selected={selectedCard === "admin"}
-                  onSelect={() => setSelectedCard("admin")}
+                  onSelect={() => !isLoading && setSelectedCard("admin")}
                 />
                 <RoleCard
                   icon={Users}
@@ -258,6 +299,7 @@ export default function RegisterPage() {
                   description="I want to book flights for my clients and earn commissions."
                   selected={selectedCard === "agent"}
                   onSelect={() => {
+                    if (isLoading) return;
                     setSelectedCard("agent");
                     setValue("role", "agent");
                   }}
@@ -268,6 +310,7 @@ export default function RegisterPage() {
                   description="I just want to search and book flights for myself."
                   selected={selectedCard === "customer"}
                   onSelect={() => {
+                    if (isLoading) return;
                     setSelectedCard("customer");
                     setValue("role", "customer");
                   }}
@@ -299,8 +342,9 @@ export default function RegisterPage() {
             <div className="animate-in fade-in slide-in-from-right-4 duration-500">
               
               <button 
-                onClick={() => setStep(1)}
-                className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors mb-8 group"
+                onClick={() => !isLoading && setStep(1)}
+                disabled={isLoading}
+                className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors mb-8 group disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-slate-500"
               >
                 <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
                 Back to roles
