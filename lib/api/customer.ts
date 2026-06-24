@@ -90,11 +90,7 @@ export const customerApi = {
         const data = r.data;
         return {
           ...data,
-          results: (data.results || []).map((f: any) => ({
-            ...f,
-            duration: `${Math.floor(f.duration_minutes / 60)}h ${f.duration_minutes % 60}m`,
-            refundable: f.is_refundable,
-          })),
+          results: data.results || [],
         };
       });
   },
@@ -104,7 +100,7 @@ export const customerApi = {
     const queryParams: any = {};
     if (params) {
       if (params.page) queryParams.page = params.page;
-      if (params.size) queryParams.page_size = params.size;
+      if (params.size) queryParams.size = params.size;
       if (params.status) queryParams.status = params.status;
       if (params.booking_type) queryParams.booking_type = params.booking_type;
     }
@@ -173,7 +169,10 @@ export const customerApi = {
     if (id.includes(":")) {
       booking_id = id.split(":")[1];
     }
-    return apiClient.put(`/bookings/${booking_id}/cancel`, { reason }).then((r) => r.data);
+    const safeReason = reason && reason.trim().length >= 10
+      ? reason.trim()
+      : "Cancelled by user via dashboard";
+    return apiClient.put(`/bookings/${booking_id}/cancel`, { reason: safeReason }).then((r) => r.data);
   },
 
   downloadTicket: (compositeId: string): Promise<Blob> => {

@@ -22,7 +22,13 @@ export const authApi = {
   },
 
   logout: async () => {
-    await apiClient.post("/auth/logout");
+    const refreshToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("refresh_token")
+        : null;
+    await apiClient.post("/auth/logout", {
+      refresh_token: refreshToken ?? undefined,
+    });
   },
 
   me: async () => {

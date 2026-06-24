@@ -50,7 +50,7 @@ export default function CustomerConfirmPage({ params }: { params: Promise<{ id: 
   const ref = statusData?.booking_reference || booking?.booking_ref;
 
   // Render Loading / Pending state
-  if (statusLoading || (status === "pending" || status === "processing")) {
+  if (statusLoading || status === "pending") {
     return (
       <div className="max-w-md mx-auto py-16 text-center space-y-6">
         <div className="relative flex justify-center items-center">

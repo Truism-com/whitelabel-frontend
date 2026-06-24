@@ -32,7 +32,7 @@ export interface FlightSegment {
 }
 
 export interface FareBreakdown {
-  base_fare:    number;           // paise
+  base_fare:    number;           // rupees float
   taxes:        number;
   fees:         number;
   markup?:      number;
@@ -73,13 +73,15 @@ export interface Passenger {
   last_name:        string;
   dob:              string;       // YYYY-MM-DD, REQUIRED
   passport_number?: string;
+  passport_expirydate?: string;   // YYYY/MM/DD — required for international
+  passport_issuing_country_code?: string; // 2-letter ISO — required for international
   nationality?:     string;       // 2-3 letter ISO country code
 }
 
 /* --- Booking --- */
 export type BookingStatus =
-  | "pending" | "confirmed" | "processing"
-  | "cancelled" | "refunded" | "failed";
+  | "pending" | "confirmed" | "ticketing_failed"
+  | "cancelled" | "refunded" | "expired";
 
 export interface CreateBookingRequest {
   search_id:     string;
@@ -111,8 +113,8 @@ export interface AgentBooking {
   client_name?:     string;
   contact_email?:   string;
   contact_phone?:   string;
-  total_amount:     number;      // paise
-  commission?:      number;      // paise
+  total_amount:     number;      // rupees float
+  commission?:      number;      // rupees float
   ticket_url?:      string;
   created_at:       string;
   updated_at?:      string;
@@ -130,16 +132,16 @@ export interface AgentStats {
   confirmed_bookings: number;
   pending_bookings:   number;
   cancelled_bookings: number;
-  revenue_mtd:        number;    // paise
-  commission_mtd:     number;    // paise
-  wallet_balance:     number;    // paise
-  credit_limit?:      number;    // paise
+  revenue_mtd:        number;    // rupees float
+  commission_mtd:     number;    // rupees float
+  wallet_balance:     number;    // rupees float
+  credit_limit?:      number;    // rupees float
   bookings_trend?:    { date: string; bookings: number; revenue: number }[];
 }
 
 /* ─── Topup ──────────────────────────────────────────────────────── */
 export interface TopupRequestPayload {
-  amount:         number;        // paise
+  amount:         number;        // rupees float
   payment_method: "upi" | "neft" | "imps" | "rtgs" | "cheque" | "cash";
   reference?:     string;
   proof_url?:     string;

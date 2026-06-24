@@ -92,11 +92,7 @@ export const agentApi = {
         const data = r.data;
         return {
           ...data,
-          results: (data.results || []).map((f: any) => ({
-            ...f,
-            duration: `${Math.floor(f.duration_minutes / 60)}h ${f.duration_minutes % 60}m`,
-            refundable: f.is_refundable,
-          })),
+          results: data.results || [],
         };
       });
   },
@@ -141,7 +137,10 @@ export const agentApi = {
     if (id.includes(":")) {
       booking_id = id.split(":")[1];
     }
-    return apiClient.put(`/bookings/${booking_id}/cancel`, { reason }).then((r) => r.data);
+    const safeReason = reason && reason.trim().length >= 10
+      ? reason.trim()
+      : "Cancelled by agent via dashboard";
+    return apiClient.put(`/bookings/${booking_id}/cancel`, { reason: safeReason }).then((r) => r.data);
   },
 
   downloadTicket: (id: string): Promise<Blob> => {

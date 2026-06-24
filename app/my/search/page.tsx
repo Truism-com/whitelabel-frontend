@@ -43,6 +43,8 @@ const passengerSchema = z.object({
   last_name:   z.string().min(2, "Must be 2-100 characters").max(100, "Must be 2-100 characters"),
   dob:         z.string().min(1, "Date of birth is required"),
   passport_no: z.string().optional(),
+  passport_expiry: z.string().optional(),
+  passport_issuing_country: z.string().length(2, "Must be a 2-letter ISO code").optional(),
   nationality: z.string().length(2, "Must be a 2-letter ISO code (e.g. IN)").optional(),
 });
 
@@ -255,6 +257,8 @@ export default function SearchPage() {
         last_name: p.last_name,
         dob: p.dob,
         passport_number: p.passport_no || undefined,
+        passport_expirydate: p.passport_expiry ? p.passport_expiry.replace(/-/g, "/") : undefined,
+        passport_issuing_country_code: p.passport_issuing_country || undefined,
         nationality: p.nationality || undefined,
       })),
       payment_details: {
@@ -473,6 +477,14 @@ export default function SearchPage() {
                       </FormField>
                       <FormField label="Nationality" error={pErr?.nationality?.message} hint="2-letter ISO country code (e.g. IN)">
                         <Input {...bReg(`passengers.${i}.nationality`, { setValueAs: (v: string) => v?.toUpperCase()?.trim() })} placeholder="IN" maxLength={2} className="uppercase font-mono" />
+                      </FormField>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <FormField label="Passport Expiry" error={pErr?.passport_expiry?.message} hint="Required for international flights">
+                        <Input {...bReg(`passengers.${i}.passport_expiry`)} type="date" />
+                      </FormField>
+                      <FormField label="Issuing Country" error={pErr?.passport_issuing_country?.message} hint="2-letter ISO code (e.g. IN)">
+                        <Input {...bReg(`passengers.${i}.passport_issuing_country`, { setValueAs: (v: string) => v?.toUpperCase()?.trim() })} placeholder="IN" maxLength={2} className="uppercase font-mono" />
                       </FormField>
                     </div>
                     <input type="hidden" {...bReg(`passengers.${i}.type`)} value="ADT" />

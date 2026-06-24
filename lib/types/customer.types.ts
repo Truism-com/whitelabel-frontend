@@ -27,7 +27,7 @@ export interface CustomerBooking {
   passengers?:      Passenger[];
   contact_email?:   string;
   contact_phone?:   string;
-  total_amount:     number;      // paise
+  total_amount:     number;      // rupees float
   fare_breakdown?:  FareBreakdown;
   ticket_url?:      string;
   segments?:        FlightSegment[];
@@ -49,9 +49,9 @@ export interface CustomerStats {
   upcoming_trips:     number;
   completed_trips:    number;
   cancelled_bookings: number;
-  total_spent:        number;    // paise
-  wallet_balance:     number;    // paise
-  savings?:           number;    // paise (discounts applied)
+  total_spent:        number;    // rupees float
+  wallet_balance:     number;    // rupees float
+  savings?:           number;    // rupees float (discounts applied)
 }
 
 /* ─── Upcoming trip (dashboard card) ────────────────────────────── */
